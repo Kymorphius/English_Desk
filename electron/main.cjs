@@ -1,4 +1,4 @@
-const {app,BrowserWindow,ipcMain,session,clipboard,dialog,Tray,Menu,nativeImage,screen,Notification}=require('electron');
+const {app,BrowserWindow,ipcMain,session,clipboard,dialog,Tray,Menu,nativeImage,screen,Notification,safeStorage}=require('electron');
 const path=require('node:path');const fs=require('node:fs/promises');
 app.setName('English Desk Studio');
 if(process.platform==='win32')app.setAppUserModelId('com.vienky.englishdesk.studio');
@@ -27,6 +27,13 @@ function trayMenu(){return Menu.buildFromTemplate([
 app.on('before-quit',()=>{quitting=true;if(nativePanel){nativePanel.dispose();nativePanel=null}});
 const trusted=e=>e.sender===win?.webContents && e.senderFrame===win.webContents.mainFrame;
 function handle(name,fn){ipcMain.handle(name,(e,...args)=>{if(!trusted(e))throw Error('Untrusted sender');return fn(...args)})}
+const apiKeyPath=path.join(app.getPath('userData'),'api-keys.json');
+async function readApiKeys(){try{return JSON.parse(await fs.readFile(apiKeyPath,'utf8'))}catch{return{}}}
+function keySlot(provider){if(typeof provider!=='string'||!provider||provider.length>300)throw Error('无效的服务商');return provider}
+handle('get-api-key',async provider=>{const stored=(await readApiKeys())[keySlot(provider)];if(!stored||!safeStorage.isEncryptionAvailable())return '';try{return safeStorage.decryptString(Buffer.from(stored,'base64'))}catch{return ''}});
+handle('set-api-key',async(provider,key)=>{const keys=await readApiKeys(),slot=keySlot(provider);key=String(key||'').trim();
+ if(!key)delete keys[slot];else{if(!safeStorage.isEncryptionAvailable())throw Error('系统加密不可用，密钥未保存');if(key.length>2000)throw Error('密钥过长');keys[slot]=safeStorage.encryptString(key).toString('base64')}
+ await fs.mkdir(app.getPath('userData'),{recursive:true});await fs.writeFile(apiKeyPath,JSON.stringify(keys),{mode:0o600});return true});
 const reminders=require('./word-reminder.cjs').createReminder(path.join(app.getPath('userData'),'word-reminder.json'),()=>{
  if(!Notification.isSupported())return false;
  const notification=new Notification({title:'English Desk · 背词提醒',body:'今天的单词可以开始复习了。点击打开背词面板。'});
