@@ -31,6 +31,9 @@
   self.glass.frame=NSMakeRect(0,0,size.width,size.height);self.content.frame=self.glass.bounds;
   [NSApp activateIgnoringOtherApps:YES];
   [self.popover showRelativeToRect:b.bounds ofView:b preferredEdge:NSMinYEdge];
+  // macOS 26 first places the popover a few points into the menu bar and moves it down about 0.1s later; put it at the final place now so nothing moves.
+  NSWindow *pw=self.popover.contentViewController.view.window;CGFloat overlap=NSMaxY(pw.frame)-NSMinY(b.window.frame);
+  if(overlap>0&&overlap<12){NSRect f=pw.frame;f.origin.y-=overlap;[pw setFrame:f display:NO];}
   NSWindow *w=self.popover.contentViewController.view.window;
   w.level=NSFloatingWindowLevel;
   [w makeKeyWindow]; [w makeFirstResponder:self.content];
