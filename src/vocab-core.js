@@ -80,14 +80,15 @@
  const KEY_ACTIONS=['flip','again','hard','good','easy','mastered','speak','undo','ignore','link'];
  const ADDED_ACTIONS=['undo','ignore','link']; // actions introduced after bindings could first be saved
  const KEY_PRESETS={digits:{flip:'Space',again:'Digit1',hard:'Digit2',good:'Digit3',easy:'Digit4',mastered:'Digit5',speak:'KeyR',undo:'KeyO',ignore:'KeyX',link:'KeyL'},home:{flip:'Space',again:'KeyA',hard:'KeyS',good:'KeyD',easy:'KeyF',mastered:'KeyJ',speak:'KeyR',undo:'KeyO',ignore:'KeyX',link:'KeyL'}};
+ const DEFAULT_PRESET='home';
  const SYMBOLS={Space:'空格',Enter:'回车',Backspace:'⌫',ArrowLeft:'←',ArrowRight:'→',ArrowUp:'↑',ArrowDown:'↓',Semicolon:';',Quote:"'",Comma:',',Period:'.',Slash:'/',Backslash:'\\',BracketLeft:'[',BracketRight:']',Backquote:'`',Minus:'-',Equal:'='};
  const normalizeCode=code=>String(code||'').replace(/^Numpad(\d)$/,'Digit$1').replace(/^NumpadEnter$/,'Enter');
  const bindable=code=>/^(Key[A-Z]|Digit\d)$/.test(normalizeCode(code))||Object.hasOwn(SYMBOLS,normalizeCode(code));
  const keyLabel=code=>{code=normalizeCode(code);return SYMBOLS[code]||code.replace(/^Key|^Digit/,'')};
  function keyBindings(saved){saved=saved&&typeof saved==='object'?{...saved}:{};
   // Bindings saved before an action existed get its default key, or the first free letter if that key is taken.
-  for(const a of ADDED_ACTIONS)if(!saved[a]&&Object.keys(saved).length){const used=new Set(Object.values(saved).map(normalizeCode)),free=[KEY_PRESETS.digits[a],...'OPQUWXYZBCEGHIKLMNTV'.split('').map(c=>'Key'+c)].find(c=>!used.has(c));if(free)saved[a]=free}
-  const b={...KEY_PRESETS.digits,...saved};const codes=KEY_ACTIONS.map(a=>b[a]);return codes.every(bindable)&&new Set(codes).size===codes.length?Object.fromEntries(KEY_ACTIONS.map(a=>[a,normalizeCode(b[a])])):{...KEY_PRESETS.digits}}
+  for(const a of ADDED_ACTIONS)if(!saved[a]&&Object.keys(saved).length){const used=new Set(Object.values(saved).map(normalizeCode)),free=[KEY_PRESETS[DEFAULT_PRESET][a],...'OPQUWXYZBCEGHIKLMNTV'.split('').map(c=>'Key'+c)].find(c=>!used.has(c));if(free)saved[a]=free}
+  const b={...KEY_PRESETS[DEFAULT_PRESET],...saved};const codes=KEY_ACTIONS.map(a=>b[a]);return codes.every(bindable)&&new Set(codes).size===codes.length?Object.fromEntries(KEY_ACTIONS.map(a=>[a,normalizeCode(b[a])])):{...KEY_PRESETS[DEFAULT_PRESET]}}
  function bindKey(bindings,action,code){code=normalizeCode(code);if(!KEY_ACTIONS.includes(action)||!bindable(code))throw Error('无法绑定这个按键');const next={...bindings},other=KEY_ACTIONS.find(a=>a!==action&&next[a]===code);if(other)next[other]=bindings[action];next[action]=code;return {bindings:next,swapped:other||null}}
  const keyPreset=bindings=>Object.keys(KEY_PRESETS).find(p=>KEY_ACTIONS.every(a=>KEY_PRESETS[p][a]===bindings[a]))||'custom';
  // Return is always another way to reveal the answer unless it has been bound to something else.
@@ -105,5 +106,5 @@
  function variantOf(word){const k=key(word);for(const [br,am] of SPELLING_VARIANTS){if(k===br)return {label:'英式拼写',other:am,same:true,tip:VARIANT_TIP};if(k===am)return {label:'美式拼写',other:br,same:true,tip:VARIANT_TIP}}for(const [br,am,note] of SPELLING_NOTES)if(k===br)return {label:'英式拼写',other:am,note,tip:VARIANT_TIP};return null}
  // Known words have no daily target, so their bar uses steps that widen as the count grows.
  const knownGoal=n=>[10,20,50,100,200,500,1000,2000,5000].find(m=>m>n)||Math.max(n,1);
- const api={key,day,parse,knownGoal,variantOf,queue,grade,today,overall,tomorrow,level,levelTable,MASTERED_DAYS,ALGORITHMS,KEY_ACTIONS,KEY_PRESETS,normalizeCode,bindable,keyLabel,keyBindings,bindKey,keyPreset,keyAction};if(typeof module!=='undefined')module.exports=api;else root.Vocab=api;
+ const api={key,day,parse,knownGoal,variantOf,queue,grade,today,overall,tomorrow,level,levelTable,MASTERED_DAYS,ALGORITHMS,KEY_ACTIONS,KEY_PRESETS,DEFAULT_PRESET,normalizeCode,bindable,keyLabel,keyBindings,bindKey,keyPreset,keyAction};if(typeof module!=='undefined')module.exports=api;else root.Vocab=api;
 })(globalThis);
