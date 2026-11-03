@@ -77,13 +77,17 @@
  // What waits tomorrow: reviews falling due before tomorrow ends, plus tomorrow's new words.
  function tomorrow(words,progress,limit,now=Date.now()){const end=new Date(now);end.setHours(0,0,0,0);end.setDate(end.getDate()+2);let reviews=0,fresh=0;for(const w of words){const p=progress[key(w.word)];if(p){if(p.due<end.getTime())reviews++}else fresh++}return {reviews,fresh:Math.min(limit,fresh)}}
  // Keyboard bindings, stored as physical key codes so they work regardless of input method or keyboard layout.
- const KEY_ACTIONS=['flip','again','hard','good','easy','mastered','speak'];
- const KEY_PRESETS={digits:{flip:'Space',again:'Digit1',hard:'Digit2',good:'Digit3',easy:'Digit4',mastered:'Digit5',speak:'KeyR'},home:{flip:'Space',again:'KeyA',hard:'KeyS',good:'KeyD',easy:'KeyF',mastered:'KeyJ',speak:'KeyR'}};
+ const KEY_ACTIONS=['flip','again','hard','good','easy','mastered','speak','undo'];
+ const ADDED_ACTIONS=['undo']; // actions introduced after bindings could first be saved
+ const KEY_PRESETS={digits:{flip:'Space',again:'Digit1',hard:'Digit2',good:'Digit3',easy:'Digit4',mastered:'Digit5',speak:'KeyR',undo:'KeyO'},home:{flip:'Space',again:'KeyA',hard:'KeyS',good:'KeyD',easy:'KeyF',mastered:'KeyJ',speak:'KeyR',undo:'KeyO'}};
  const SYMBOLS={Space:'空格',Enter:'回车',Backspace:'⌫',ArrowLeft:'←',ArrowRight:'→',ArrowUp:'↑',ArrowDown:'↓',Semicolon:';',Quote:"'",Comma:',',Period:'.',Slash:'/',Backslash:'\\',BracketLeft:'[',BracketRight:']',Backquote:'`',Minus:'-',Equal:'='};
  const normalizeCode=code=>String(code||'').replace(/^Numpad(\d)$/,'Digit$1').replace(/^NumpadEnter$/,'Enter');
  const bindable=code=>/^(Key[A-Z]|Digit\d)$/.test(normalizeCode(code))||Object.hasOwn(SYMBOLS,normalizeCode(code));
  const keyLabel=code=>{code=normalizeCode(code);return SYMBOLS[code]||code.replace(/^Key|^Digit/,'')};
- function keyBindings(saved){const b={...KEY_PRESETS.digits,...(saved&&typeof saved==='object'?saved:{})};const codes=KEY_ACTIONS.map(a=>b[a]);return codes.every(bindable)&&new Set(codes).size===codes.length?Object.fromEntries(KEY_ACTIONS.map(a=>[a,normalizeCode(b[a])])):{...KEY_PRESETS.digits}}
+ function keyBindings(saved){saved=saved&&typeof saved==='object'?{...saved}:{};
+  // Bindings saved before an action existed get its default key, or the first free letter if that key is taken.
+  for(const a of ADDED_ACTIONS)if(!saved[a]&&Object.keys(saved).length){const used=new Set(Object.values(saved).map(normalizeCode)),free=[KEY_PRESETS.digits[a],...'OPQUWXYZBCEGHIKLMNTV'.split('').map(c=>'Key'+c)].find(c=>!used.has(c));if(free)saved[a]=free}
+  const b={...KEY_PRESETS.digits,...saved};const codes=KEY_ACTIONS.map(a=>b[a]);return codes.every(bindable)&&new Set(codes).size===codes.length?Object.fromEntries(KEY_ACTIONS.map(a=>[a,normalizeCode(b[a])])):{...KEY_PRESETS.digits}}
  function bindKey(bindings,action,code){code=normalizeCode(code);if(!KEY_ACTIONS.includes(action)||!bindable(code))throw Error('无法绑定这个按键');const next={...bindings},other=KEY_ACTIONS.find(a=>a!==action&&next[a]===code);if(other)next[other]=bindings[action];next[action]=code;return {bindings:next,swapped:other||null}}
  const keyPreset=bindings=>Object.keys(KEY_PRESETS).find(p=>KEY_ACTIONS.every(a=>KEY_PRESETS[p][a]===bindings[a]))||'custom';
  // Return is always another way to reveal the answer unless it has been bound to something else.
@@ -93,5 +97,5 @@
  function levelTable(total){const t=LEVELS.filter(([min])=>min===0||min<total);return [...t,[Math.max(total,1),'词库通关']]}
  // A level once reached is kept (peak), so forgetting a few words never takes it away; the count itself stays truthful.
  function level(mastered,total,peak=1){const t=levelTable(total);let n=t.filter(([min])=>mastered>=min).length;n=Math.max(n,Math.min(peak,t.length));const [min,name]=t[n-1],next=t[n];return {n,name,min,next:next?{n:n+1,name:next[1],min:next[0]}:null}}
- const api={key,day,parse,queue,grade,today,overall,tomorrow,level,MASTERED_DAYS,ALGORITHMS,KEY_ACTIONS,KEY_PRESETS,normalizeCode,bindable,keyLabel,keyBindings,bindKey,keyPreset,keyAction};if(typeof module!=='undefined')module.exports=api;else root.Vocab=api;
+ const api={key,day,parse,queue,grade,today,overall,tomorrow,level,levelTable,MASTERED_DAYS,ALGORITHMS,KEY_ACTIONS,KEY_PRESETS,normalizeCode,bindable,keyLabel,keyBindings,bindKey,keyPreset,keyAction};if(typeof module!=='undefined')module.exports=api;else root.Vocab=api;
 })(globalThis);
