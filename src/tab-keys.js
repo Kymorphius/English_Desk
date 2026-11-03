@@ -15,4 +15,11 @@
   e.preventDefault();if(!target.classList.contains('selected'))target.click();
  });
  document.addEventListener('keyup',hideHints);window.addEventListener('blur',hideHints);
+ // The shortcuts are listed in the settings, after the boss key or the panel appearance, whenever that page is drawn.
+ const names=tabs.map(b=>b.firstChild.textContent.trim());
+ const addSettings=()=>{const ws=document.querySelector('#workspace');if(!ws||ws.querySelector('#tabKeySettings')||!tabs.find(b=>b.dataset.page==='settings')?.classList.contains('selected'))return;
+  const box=document.createElement('section');box.className='section';box.id='tabKeySettings';
+  box.innerHTML=`<h2>标签切换</h2><div class="tab-key-list">${tabs.map((b,i)=>`<span><kbd>${mod}${i+1}</kbd>${names[i]}</span>`).join('')}<span><kbd>${mod},</kbd>设置</span></div><p class="muted">面板打开时有效。按住 ${mac?'⌘':'Ctrl'} 片刻，标签上会显示编号。</p>`;
+  const after=ws.querySelector('#bossKeySettings')||ws.querySelector('#panelBackground')?.closest('section');if(after)after.after(box);else ws.prepend(box)};
+ new MutationObserver(addSettings).observe(document.querySelector('#workspace'),{childList:true});
 })();
