@@ -30,10 +30,11 @@ function handle(name,fn){ipcMain.handle(name,(e,...args)=>{if(!trusted(e))throw 
 const apiKeyPath=path.join(app.getPath('userData'),'api-keys.json');
 async function readApiKeys(){try{return JSON.parse(await fs.readFile(apiKeyPath,'utf8'))}catch{return{}}}
 function keySlot(provider){if(typeof provider!=='string'||!provider||provider.length>300)throw Error('无效的服务商');return provider}
-handle('get-api-key',async provider=>{const stored=(await readApiKeys())[keySlot(provider)];if(!stored||!safeStorage.isEncryptionAvailable())return '';try{return safeStorage.decryptString(Buffer.from(stored,'base64'))}catch{return ''}});
-handle('set-api-key',async(provider,key)=>{const keys=await readApiKeys(),slot=keySlot(provider);key=String(key||'').trim();
- if(!key)delete keys[slot];else{if(!safeStorage.isEncryptionAvailable())throw Error('系统加密不可用，密钥未保存');if(key.length>2000)throw Error('密钥过长');keys[slot]=safeStorage.encryptString(key).toString('base64')}
+async function savedApiKey(slot){const stored=(await readApiKeys())[keySlot(slot)];if(!stored)return '';if(!safeStorage.isEncryptionAvailable())throw Error('系统加密不可用，无法读取已保存的密钥');try{return safeStorage.decryptString(Buffer.from(stored,'base64'))}catch{throw Error('无法读取已保存的密钥，请在设置中重新填写')}}
+handle('has-api-key',async slot=>Boolean((await readApiKeys())[keySlot(slot)]));
+handle('set-api-key',async(slot,key)=>{key=String(key||'').trim();if(!key)return false;if(key.length>2000)throw Error('密钥过长');if(!safeStorage.isEncryptionAvailable())throw Error('系统加密不可用，密钥未保存');const keys=await readApiKeys();keys[keySlot(slot)]=safeStorage.encryptString(key).toString('base64');
  await fs.mkdir(app.getPath('userData'),{recursive:true});await fs.writeFile(apiKeyPath,JSON.stringify(keys),{mode:0o600});return true});
+handle('delete-api-key',async slot=>{const keys=await readApiKeys();delete keys[keySlot(slot)];await fs.mkdir(app.getPath('userData'),{recursive:true});await fs.writeFile(apiKeyPath,JSON.stringify(keys),{mode:0o600});return true});
 const reminders=require('./word-reminder.cjs').createReminder(path.join(app.getPath('userData'),'word-reminder.json'),()=>{
  if(!Notification.isSupported())return false;
  const notification=new Notification({title:'English Desk · 背词提醒',body:'今天的单词可以开始复习了。点击打开背词面板。'});
@@ -65,7 +66,8 @@ handle('open-text-file',kind=>standaloneDialog(async()=>{
 }));
 handle('save-recording',async bytes=>{if(!Array.isArray(bytes)||bytes.length>30e6)throw Error('录音过大');return standaloneDialog(async()=>{const r=nativePanel?{filePath:nativePanel.selectFile('recording')}:await dialog.showSaveDialog({defaultPath:'speaking.webm',filters:[{name:'WebM audio',extensions:['webm']}]});if(r.canceled||!r.filePath)return false;await fs.writeFile(r.filePath,Buffer.from(bytes));return true})});
 const {ai}=require('./ai-client.cjs');
-handle('ai',payload=>ai(payload));
+// Saved keys are decrypted only here, when a request is actually made, so launching the app never touches the keychain.
+handle('ai',async payload=>{const {key_slot,...config}=payload?.config||{};if(!config.api_key&&key_slot)config.api_key=await savedApiKey(key_slot);return ai({...payload,config})});
 app.whenReady().then(async()=>{
  await fs.mkdir(app.getPath('userData'),{recursive:true});await reminders.load();
  const updatePref=path.join(app.getPath('userData'),'updates.json');
