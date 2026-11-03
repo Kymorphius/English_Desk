@@ -1,0 +1,76 @@
+{
+  "name": "english-desk-clean",
+  "productName": "English Desk Studio",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Independent IELTS writing and speaking practice",
+  "author": "Vienky",
+  "main": "electron/main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test tests/*.test.cjs",
+    "pack": "electron-builder --dir",
+    "dist:mac": "electron-builder --mac --arm64 --x64",
+    "dist:win": "electron-builder --win nsis",
+    "preview": "node scripts/serve.cjs",
+    "build:native": "node scripts/build-native.cjs",
+    "prestart": "npm run build:native",
+    "predist:mac": "npm run build:native",
+    "prepack": "npm run build:native"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.56.1",
+    "electron": "^45.2.1",
+    "electron-builder": "^26.0.12",
+    "node-api-headers": "^1.9.0"
+  },
+  "build": {
+    "appId": "com.vienky.englishdesk.studio",
+    "productName": "English Desk Studio",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "src/**/*",
+      "electron/**/*",
+      "data/**/*",
+      "package.json",
+      "native/macos/*.node"
+    ],
+    "mac": {
+      "category": "public.app-category.education",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
+      ],
+      "extendInfo": {
+        "NSMicrophoneUsageDescription": "录制口语练习，只有点击转写时才发送到你配置的服务。"
+      }
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "runAfterFinish": true
+    },
+    "asarUnpack": [
+      "native/macos/*.node"
+    ]
+  }
+}
