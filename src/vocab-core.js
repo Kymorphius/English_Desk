@@ -77,9 +77,9 @@
  // What waits tomorrow: reviews falling due before tomorrow ends, plus tomorrow's new words.
  function tomorrow(words,progress,limit,now=Date.now()){const end=new Date(now);end.setHours(0,0,0,0);end.setDate(end.getDate()+2);let reviews=0,fresh=0;for(const w of words){const p=progress[key(w.word)];if(p){if(p.due<end.getTime())reviews++}else fresh++}return {reviews,fresh:Math.min(limit,fresh)}}
  // Keyboard bindings, stored as physical key codes so they work regardless of input method or keyboard layout.
- const KEY_ACTIONS=['flip','again','hard','good','easy','mastered','speak','undo','ignore'];
- const ADDED_ACTIONS=['undo','ignore']; // actions introduced after bindings could first be saved
- const KEY_PRESETS={digits:{flip:'Space',again:'Digit1',hard:'Digit2',good:'Digit3',easy:'Digit4',mastered:'Digit5',speak:'KeyR',undo:'KeyO',ignore:'KeyX'},home:{flip:'Space',again:'KeyA',hard:'KeyS',good:'KeyD',easy:'KeyF',mastered:'KeyJ',speak:'KeyR',undo:'KeyO',ignore:'KeyX'}};
+ const KEY_ACTIONS=['flip','again','hard','good','easy','mastered','speak','undo','ignore','link'];
+ const ADDED_ACTIONS=['undo','ignore','link']; // actions introduced after bindings could first be saved
+ const KEY_PRESETS={digits:{flip:'Space',again:'Digit1',hard:'Digit2',good:'Digit3',easy:'Digit4',mastered:'Digit5',speak:'KeyR',undo:'KeyO',ignore:'KeyX',link:'KeyL'},home:{flip:'Space',again:'KeyA',hard:'KeyS',good:'KeyD',easy:'KeyF',mastered:'KeyJ',speak:'KeyR',undo:'KeyO',ignore:'KeyX',link:'KeyL'}};
  const SYMBOLS={Space:'空格',Enter:'回车',Backspace:'⌫',ArrowLeft:'←',ArrowRight:'→',ArrowUp:'↑',ArrowDown:'↓',Semicolon:';',Quote:"'",Comma:',',Period:'.',Slash:'/',Backslash:'\\',BracketLeft:'[',BracketRight:']',Backquote:'`',Minus:'-',Equal:'='};
  const normalizeCode=code=>String(code||'').replace(/^Numpad(\d)$/,'Digit$1').replace(/^NumpadEnter$/,'Enter');
  const bindable=code=>/^(Key[A-Z]|Digit\d)$/.test(normalizeCode(code))||Object.hasOwn(SYMBOLS,normalizeCode(code));
@@ -103,5 +103,7 @@
  const SPELLING_NOTES=[['programme','program','节目、计划义；计算机程序两边都写 program'],['licence','license','名词；动词两边都写 license'],['practise','practice','动词；名词两边都写 practice'],['tyre','tire','轮胎义'],['storey','story','楼层义'],['metre','meter','长度单位义'],['cheque','check','支票义'],['kerb','curb','路缘义'],['draught','draft','气流、生啤义'],['tonne','ton','公吨义']];
  const VARIANT_TIP='雅思英式、美式拼写都接受，同一篇里保持一致。';
  function variantOf(word){const k=key(word);for(const [br,am] of SPELLING_VARIANTS){if(k===br)return {label:'英式拼写',other:am,same:true,tip:VARIANT_TIP};if(k===am)return {label:'美式拼写',other:br,same:true,tip:VARIANT_TIP}}for(const [br,am,note] of SPELLING_NOTES)if(k===br)return {label:'英式拼写',other:am,note,tip:VARIANT_TIP};return null}
- const api={key,day,parse,variantOf,queue,grade,today,overall,tomorrow,level,levelTable,MASTERED_DAYS,ALGORITHMS,KEY_ACTIONS,KEY_PRESETS,normalizeCode,bindable,keyLabel,keyBindings,bindKey,keyPreset,keyAction};if(typeof module!=='undefined')module.exports=api;else root.Vocab=api;
+ // Known words have no daily target, so their bar uses steps that widen as the count grows.
+ const knownGoal=n=>[10,20,50,100,200,500,1000,2000,5000].find(m=>m>n)||Math.max(n,1);
+ const api={key,day,parse,knownGoal,variantOf,queue,grade,today,overall,tomorrow,level,levelTable,MASTERED_DAYS,ALGORITHMS,KEY_ACTIONS,KEY_PRESETS,normalizeCode,bindable,keyLabel,keyBindings,bindKey,keyPreset,keyAction};if(typeof module!=='undefined')module.exports=api;else root.Vocab=api;
 })(globalThis);
