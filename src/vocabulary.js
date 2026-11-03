@@ -46,8 +46,8 @@ function vocabulary(){
  renderIgnored();
  function showWord(){
   const limit=v.limit+(v.extra?.day===Vocab.day()?v.extra.count:0),options={algorithm:v.algorithm,retention:v.retention},q=Vocab.queue(words,v.progress,limit),undone=showFirst&&words.find(x=>Vocab.key(x.word)===showFirst),w=undone||q[0];showFirst=null;const box=$('#wordCard');
-  const t=Vocab.today(words,v.progress,limit),bar=status=>{if(!t.total&&!t.known)return '';const all=t.total+t.known,arc=n=>n/all*RING;
-   return `<div class="vocab-progress"><div class="vocab-progress-row"><svg class="today-ring" viewBox="0 0 24 24" role="img" aria-label="今日学会 ${t.done} / ${t.total}${t.known?`，熟词 ${t.known}`:''}"><circle class="ring-track" cx="12" cy="12" r="9"/><circle class="ring-known" cx="12" cy="12" r="9" data-len="${arc(t.known)}" data-offset="${-arc(t.done)}"/><circle class="ring-learned" cx="12" cy="12" r="9" data-len="${arc(t.done)}" data-offset="0"/></svg><span class="today-legend"><span><i class="dot learned"></i>学会 <span id="todayDone" class="count">${t.done}</span> / ${t.total}</span>${t.known?`<span><i class="dot known"></i>熟词 <span id="todayKnown" class="count">${t.known}</span></span>`:''}</span><span class="today-status">${status}</span></div></div>`};
+  const t=Vocab.today(words,v.progress,limit),bar=status=>{if(!t.total&&!t.known)return '';const all=t.total+t.known,pct=n=>n/all*100;
+   return `<div class="vocab-progress"><div class="vocab-progress-row"><span class="today-legend"><span><i class="dot learned"></i>学会 <span id="todayDone" class="count">${t.done}</span> / ${t.total}</span>${t.known?`<span><i class="dot known"></i>熟词 <span id="todayKnown" class="count">${t.known}</span></span>`:''}</span><span class="today-status">${status}</span></div><div class="hp-bar" role="img" aria-label="今日学会 ${t.done} / ${t.total}${t.known?`，熟词 ${t.known}`:''}"><span class="hp-learned" data-w="${pct(t.done)}"></span><span class="hp-known" data-w="${pct(t.known)}"></span></div></div>`};
   renderOverall();clearTimeout(wordTimer);const bumpToday=()=>{paintRing();if(lastToday){if(t.done!==lastToday.done)bump('#todayDone');if(t.known!==lastToday.known)bump('#todayKnown')}lastToday={done:t.done,known:t.known}};
   if(!w){
    const now=Date.now(),waiting=Object.values(v.progress).filter(p=>p.interval<1&&p.due>now);let message;
@@ -65,11 +65,11 @@ function vocabulary(){
   box.querySelectorAll('[data-grade]').forEach(b=>b.onclick=()=>{const k=Vocab.key(w.word),label=grades.find(([g])=>g===b.dataset.grade)[1],peakBefore=v.peakLevel||1,r=Vocab.grade(prior,b.dataset.grade,Date.now(),options);v.progress[k]=r;save();showWord();undoStack.push({key:k,word:w.word,label,before:prior,peakBefore});syncUndoButton();$('#vocabAnnounce').textContent=r.known&&!prior?`${w.word} 已标为熟词`:`${w.word}：${grades.find(([g])=>g===b.dataset.grade)[1]}，${intervalText(r.interval)}后复习`});
  }showWord();
 }
-// Today's ring: learned (green) then known words (teal), drawn as arcs that grow from where they were.
-const RING=2*Math.PI*9;let lastRing=null;
-function paintRing(){const arcs=[...document.querySelectorAll('.today-ring [data-len]')];if(!arcs.length)return;const now=arcs.map(c=>[+c.dataset.len,+c.dataset.offset]);
- arcs.forEach((c,i)=>{const [len,off]=lastRing?.[i]??now[i];c.style.strokeDasharray=`${len} ${RING}`;c.style.strokeDashoffset=off;c.style.opacity=len||now[i][0]?1:0});
- if(lastRing){arcs[0].getBoundingClientRect();arcs.forEach((c,i)=>{c.style.strokeDasharray=`${now[i][0]} ${RING}`;c.style.strokeDashoffset=now[i][1];if(!now[i][0])c.style.opacity=0})}
+// Today's bar: learned (green) then known words (teal); the fill slides from where it was and briefly brightens when it grows.
+let lastRing=null;
+function paintRing(){const bar=document.querySelector('.hp-bar');if(!bar)return;const segs=[...bar.querySelectorAll('[data-w]')],now=segs.map(x=>+x.dataset.w);
+ segs.forEach((x,i)=>{x.style.width=(lastRing?.[i]??now[i])+'%'});
+ if(lastRing){bar.getBoundingClientRect();segs.forEach((x,i)=>{x.style.width=now[i]+'%'});if(now.some((w,i)=>w>lastRing[i]))bar.classList.add('grew')}
  lastRing=now}
 let wordTimer,lastOverall=null,lastToday=null,showFirst=null,undoGrade=null;const undoStack=[];
 function syncUndoButton(){const b=$('#vocabUndo');if(!b)return;const last=undoStack.at(-1);b.disabled=!last;b.title=last?`撤销「${last.word}：${last.label}」（${Vocab.keyLabel(state.vocab.keys.undo)}）`:'没有可撤销的评分';b.setAttribute('aria-label',last?`撤销 ${last.word} 的评分`:'撤销')}
