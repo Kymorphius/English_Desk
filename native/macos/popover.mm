@@ -24,11 +24,13 @@
 }
 - (void)show {
   NSStatusBarButton *b=self.item.button;
-  NSSize size=NSMakeSize(400,MIN(720,b.window.screen.visibleFrame.size.height-30));
+  NSScreen *screen=b.window.screen?:NSScreen.mainScreen; // the status item can be hidden behind the notch, leaving no screen
+  NSSize size=NSMakeSize(400,MIN(720,screen.visibleFrame.size.height-30));
   self.popover.contentSize=size;
+  // Give the web content its final size before the popover appears; resizing it afterwards made the page reflow and visibly drop.
+  self.glass.frame=NSMakeRect(0,0,size.width,size.height);self.content.frame=self.glass.bounds;
   [NSApp activateIgnoringOtherApps:YES];
   [self.popover showRelativeToRect:b.bounds ofView:b preferredEdge:NSMinYEdge];
-  self.content.frame=self.glass.bounds;
   NSWindow *w=self.popover.contentViewController.view.window;
   w.level=NSFloatingWindowLevel;
   [w makeKeyWindow]; [w makeFirstResponder:self.content];
@@ -51,7 +53,7 @@
 - (void)popoverDidShow:(NSNotification *)notification {
   // The popover lays out its content after the opening animation.
   [self.glass layoutSubtreeIfNeeded];
-  self.content.frame=self.glass.bounds;
+  if(!NSEqualRects(self.content.frame,self.glass.bounds))self.content.frame=self.glass.bounds;
   [self.popover.contentViewController.view.window makeFirstResponder:self.content];
   [self notify:@"show"];
 }
