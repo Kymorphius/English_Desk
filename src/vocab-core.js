@@ -110,5 +110,10 @@
  function variantOf(word){const k=key(word);for(const [br,am] of SPELLING_VARIANTS){if(k===br)return {label:'英式拼写',other:am,same:true,tip:VARIANT_TIP};if(k===am)return {label:'美式拼写',other:br,same:true,tip:VARIANT_TIP}}for(const [br,am,note] of SPELLING_NOTES)if(k===br)return {label:'英式拼写',other:am,note,tip:VARIANT_TIP};return null}
  // Known words have no daily target, so their bar uses steps that widen as the count grows.
  const knownGoal=n=>[10,20,50,100,200,500,1000,2000,5000].find(m=>m>n)||Math.max(n,1);
- const api={key,day,parse,knownGoal,variantOf,queue,grade,today,overall,tomorrow,level,levelTable,legacyPeak,MASTERED_DAYS,ALGORITHMS,KEY_ACTIONS,KEY_PRESETS,DEFAULT_PRESET,normalizeCode,bindable,keyLabel,keyBindings,bindKey,keyPreset,keyAction};if(typeof module!=='undefined')module.exports=api;else root.Vocab=api;
+ // Built-in meanings run sense groups together, each led by its part of speech: "n. 小学生；中学生；n. 瞳孔". Later groups are the less familiar senses.
+ const POS_TAG=/(^|[；;])\s*((?:n|v|vt|vi|adj|adv|prep|conj|pron|int|num|art|aux|abbr|det|phr)\.)\s*/g;
+ function senses(meaning){const m=String(meaning||'').trim(),marks=[...m.matchAll(POS_TAG)],out=[];if(!marks.length)return m?[{pos:'',text:m}]:[];
+  if(marks[0].index>0)out.push({pos:'',text:m.slice(0,marks[0].index)});
+  marks.forEach((x,i)=>out.push({pos:x[2],text:m.slice(x.index+x[0].length,i+1<marks.length?marks[i+1].index:m.length).replace(/[；;\s]+$/,'')}));return out.filter(x=>x.text)}
+ const api={key,day,parse,knownGoal,variantOf,senses,queue,grade,today,overall,tomorrow,level,levelTable,legacyPeak,MASTERED_DAYS,ALGORITHMS,KEY_ACTIONS,KEY_PRESETS,DEFAULT_PRESET,normalizeCode,bindable,keyLabel,keyBindings,bindKey,keyPreset,keyAction};if(typeof module!=='undefined')module.exports=api;else root.Vocab=api;
 })(globalThis);
