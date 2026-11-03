@@ -74,7 +74,8 @@ static napi_value Create(napi_env env,napi_callback_info info){
   panel.content.frame=panel.glass.bounds;panel.content.translatesAutoresizingMaskIntoConstraints=YES;panel.content.autoresizingMask=NSViewWidthSizable|NSViewHeightSizable;[panel.glass addSubview:panel.content];
   NSViewController *vc=[NSViewController new];vc.view=panel.glass;
   panel.popover=[NSPopover new];panel.popover.contentViewController=vc;panel.popover.delegate=panel;
-  panel.popover.contentSize=NSMakeSize(400,720);panel.popover.behavior=pinned?NSPopoverBehaviorApplicationDefined:NSPopoverBehaviorTransient;
+  panel.popover.contentSize=NSMakeSize(400,720);panel.popover.animates=NO; // appear at once, like the system's menu bar extras, instead of dropping in
+  panel.popover.behavior=pinned?NSPopoverBehaviorApplicationDefined:NSPopoverBehaviorTransient;
   panel.item=[NSStatusBar.systemStatusBar statusItemWithLength:NSSquareStatusItemLength];
   panel.item.autosaveName=@"EnglishDeskStudioStatus";
   NSStatusBarButton *button=panel.item.button;button.image=[NSImage imageWithSystemSymbolName:@"character.book.closed" accessibilityDescription:@"English Desk Studio"];[button.image setTemplate:YES];
