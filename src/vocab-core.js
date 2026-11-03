@@ -88,5 +88,8 @@
  const keyPreset=bindings=>Object.keys(KEY_PRESETS).find(p=>KEY_ACTIONS.every(a=>KEY_PRESETS[p][a]===bindings[a]))||'custom';
  // Return is always another way to reveal the answer unless it has been bound to something else.
  function keyAction(bindings,code){code=normalizeCode(code);return KEY_ACTIONS.find(a=>bindings[a]===code)||(code==='Enter'?'flip':null)}
- const api={key,day,parse,queue,grade,today,overall,tomorrow,MASTERED_DAYS,ALGORITHMS,KEY_ACTIONS,KEY_PRESETS,normalizeCode,bindable,keyLabel,keyBindings,bindKey,keyPreset,keyAction};if(typeof module!=='undefined')module.exports=api;else root.Vocab=api;
+ // Milestones give the overall bar a scale where a single word still shows; the last one is the whole list.
+ const MILESTONES=[50,100,200,500,1000,2000,3000,5000];
+ const milestone=(learned,total)=>MILESTONES.find(m=>m>learned&&m<total)||total;
+ const api={key,day,parse,queue,grade,today,overall,tomorrow,milestone,MASTERED_DAYS,ALGORITHMS,KEY_ACTIONS,KEY_PRESETS,normalizeCode,bindable,keyLabel,keyBindings,bindKey,keyPreset,keyAction};if(typeof module!=='undefined')module.exports=api;else root.Vocab=api;
 })(globalThis);
