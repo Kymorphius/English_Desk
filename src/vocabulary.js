@@ -25,7 +25,8 @@ document.addEventListener('keydown',e=>{
  if(page!=='vocabulary'||e.metaKey||e.ctrlKey||e.altKey||e.repeat||document.querySelector('.select-menu'))return;
  const t=e.target;if(t.closest?.('input,textarea,select,[contenteditable="true"]'))return;
  const back=$('#wordBack');if(!back)return;
- if((e.key===' '||e.key==='Enter')&&back.hidden){if(t.tagName==='BUTTON'&&t.id!=='flipWord'&&e.key==='Enter')return;e.preventDefault();$('#flipWord').click()}
+ if((e.key===' '||e.key==='Enter')&&t.tagName==='BUTTON'&&t.id!=='flipWord')return; // a focused button keeps its standard activation
+ if((e.key===' '||e.key==='Enter')&&back.hidden){e.preventDefault();$('#flipWord').click()}
  else if(/^[1-5]$/.test(e.key)&&!back.hidden){e.preventDefault();back.querySelectorAll('[data-grade]')[Number(e.key)-1]?.click()}
  else if(e.key==='r'||e.key==='R'){e.preventDefault();$('#speakWord')?.click()}
 });
