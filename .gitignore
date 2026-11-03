@@ -1,0 +1,12 @@
+node_modules/
+release/
+.DS_Store
+.env*
+test-results/
+playwright-report/
+*.webm
+*.wav
+
+outputs/
+
+native/macos/*.node

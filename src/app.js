@@ -1,0 +1,142 @@
+'use strict';
+const $=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const KEY='english-desk-studio-v1';
+const confirmAction=message=>window.desktop?.confirm?desktop.confirm(message):Promise.resolve(window.confirm(message));
+let saved;try{saved=JSON.parse(localStorage.getItem(KEY)||'{}')}catch{saved={}}
+let state={templates:[],materials:[],custom:[],drafts:{},ideas:{},...saved};
+let page='writing',selected={writing:BANK.writing[0].id,speaking:BANK.part1[0].id},filter='',search='',config={base_url:'',api_key:'',model:'',transcription_model:'',...state.settings};
+let recorder=null,stream=null,audioBlob=null,audioURL=null,recordingQuestion=null,recordTimer=null,recordStart=0,apiBusy=false;
+const allSpeaking=Core.unique([...BANK.part1,...BANK.speaking,...BANK.speaking.flatMap(q=>q.followups),...state.custom]);
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(state))}catch{toast('本地存储已满，请导出或删除部分导入内容。')}};
+function toast(text){$('#toast').textContent=text;$('#toast').classList.add('visible');clearTimeout(toast.timer);toast.timer=setTimeout(()=>$('#toast').classList.remove('visible'),4500)}
+const all=()=>page==='writing'?BANK.writing:Core.speakingCards(allSpeaking);
+const current=()=>all().find(q=>q.id===selected[page]);
+const pool=()=>all().filter(q=>(!filter||(page==='writing'?q.category===filter:String(q.part)===filter))&&(!search||[q.title,q.question,q.translation,...(q.questions||[]).map(x=>x.question)].join(' ').toLowerCase().includes(search.toLowerCase())));
+const draft=q=>state.drafts[q.id]??(q.questions?q.questions.filter(x=>state.drafts[x.id]).map(x=>x.question+'\n'+state.drafts[x.id]).join('\n\n'):'');
+async function copy(text){try{if(window.desktop)await desktop.copy(text);else await navigator.clipboard.writeText(text);toast('已复制，可粘贴到 AI')}catch{toast('复制失败，请手动选择文字复制')}}
+function stopRecording(){if(recorder?.state==='recording')recorder.stop()}
+function changePage(next){if(part1Starting||recorder?.state==='recording'){toast('请先停止录音，再切换页面');return}stopSpeech();page=next;filter='';search='';render()}
+document.querySelectorAll('[data-page]').forEach(b=>b.onclick=()=>changePage(b.dataset.page));
+function header(title,desc,actions=''){ $('#top').innerHTML=`<div><h1>${title}</h1><small>${desc}</small></div><div class="tools">${actions}</div>`;document.querySelectorAll('[data-page]').forEach(b=>b.classList.toggle('selected',b.dataset.page===page));}
+function render(){if(page==='vocabulary')return vocabulary();if(page==='library')return library();if(page==='settings')return settings();practice()}
+function practice(){
+ const writing=page==='writing';header(writing?'写作练习':'口语练习',writing?'Task 2 · 261 道题，每题附立场与因果链':'Part 1 / 2 / 3 · 三份原创示范，其余题目可自行作答',`<button id="draw" class="primary">${writing?'抽一道写作题':filter==='1'?'抽一张话题卡':'随机抽取'}</button>${writing?'':'<button id="round">抽一组模拟题</button>'}`);
+ const opts=writing?[...new Set(BANK.writing.map(q=>q.category))]:['1','2','3'];let list=pool();if(!list.some(q=>q.id===selected[page]))selected[page]=list[0]?.id;
+ $('#workspace').innerHTML=`<div class="filters"><input id="search" aria-label="搜索题目" placeholder="搜索题目或话题" value="${esc(search)}"><select id="filter" aria-label="筛选题目"><option value="">${writing?'全部分类':'全部 Part'}</option>${opts.map(v=>`<option value="${esc(v)}" ${v===filter?'selected':''}>${writing?esc(v):'Part '+v}</option>`).join('')}</select></div><select class="question-picker" id="picker" aria-label="选择题目">${list.map(q=>`<option value="${q.id}" ${q.id===selected[page]?'selected':''}>${q.questions?'Part 1 · '+esc(q.title)+' · '+q.questions.length+' 个问题':esc(q.title)+' · '+esc(q.question)}</option>`).join('')}</select><div id="question-view"></div><div id="round-view"></div>`;
+ $('#search').oninput=e=>{if(part1Starting||recorder?.state==='recording'){toast('录音中不能切题');return}search=e.target.value;const start=e.target.selectionStart;practice();$('#search').focus();$('#search').setSelectionRange(start,start)};
+ $('#filter').onchange=e=>{if(part1Starting||recorder?.state==='recording'){e.target.value=filter;return toast('录音中不能切题')}filter=e.target.value;practice()};
+ $('#picker').onchange=e=>choose(e.target.value);
+ $('#draw').onclick=()=>{const q=Core.draw(pool(),selected[page]);if(q)choose(q.id);else toast('没有匹配题目')};
+ if($('#round'))$('#round').onclick=round;
+ question();
+}
+function choose(id){if(part1Starting||recorder?.state==='recording'){toast('请先停止录音');$('#picker').value=selected[page];return}stopSpeech();selected[page]=id;$('#picker').value=id;question()}
+function renderChain(chain){
+ if(typeof chain==='string')return `<div class="chain">${chain.split('→').map(esc).join('<span class="arrow">→</span>')}</div>`;
+ return `<section class="detailed-chain"><h3>${esc(chain.title)}</h3><ol class="logic-steps">${chain.steps.map(step=>`<li>${esc(step)}</li>`).join('')}</ol><div class="worked-example"><b>具体例子（假设情境）</b><p>${esc(chain.example)}</p></div><details class="expressions" open><summary>可用表达</summary>${(chain.expressions||[]).map(e=>`<p><strong>${esc(e.en)}</strong><br><span class="muted">${esc(e.zh)}</span></p>`).join('')}</details>${chain.paragraph?`<details><summary>段落示范</summary><p class="answer">${esc(chain.paragraph)}</p></details>`:''}</section>`;
+}
+function ideasEditor(q){return `<h3>先写我的逻辑链</h3><label for="ideas">先想几点：立场、分论点、原因、结果和例子</label><textarea id="ideas" aria-label="我的逻辑链" placeholder="用中文写即可。先写自己的观点，再展开原因、结果和具体例子。">${esc(state.ideas[q.id]||'')}</textarea><small>按题目自动保存</small><div class="tools"><button id="completeIdeas" class="primary">帮我补全成逻辑链</button><button id="copyIdeas">复制思路到 AI</button></div><div id="ideasResult" class="result" aria-live="polite"></div><details class="reference-logic"><summary>直接看参考逻辑链</summary>`}
+async function completeIdeas(q){
+ const target=$('#ideasResult'),button=$('#completeIdeas');
+ if(!config.base_url&&!config.api_key){
+  target.innerHTML='<p>尚未连接模型，请先到设置中配置 API 或启用已部署的本地模型。</p><button id="configureIdeasModel">去设置</button>';
+  $('#configureIdeasModel').onclick=()=>changePage('settings');return;
+ }
+ const ideas=state.ideas[q.id]||'';
+ if(!ideas.trim()){target.textContent='请先在上方写下你的立场或几个想法，再补全逻辑链。';$('#ideas').focus();return}
+ if(apiBusy){target.textContent='已有请求正在处理，请稍后再试。';return}
+ if(!window.desktop){target.textContent='请在桌面版中连接模型；浏览器预览可使用旁边的复制按钮。';return}
+ apiBusy=true;button.disabled=true;target.textContent='正在生成并校验你的思路，失败最多重试一次…';
+ try{target.textContent=await desktop.ai({config,task:'plan',prompt:Core.planPrompt(questionWithLogic(q),ideas)})}catch(e){target.textContent=e.message}finally{apiBusy=false;button.disabled=false}
+}
+
+function question(){
+ const q=current();if(!q){$('#question-view').innerHTML='<div class="section">没有匹配题目，请修改搜索或分类。</div>';return}
+ const writing=q.kind==='writing';if(q.questions){renderPart1(q);return}
+ $('#question-view').innerHTML=`<article class="question"><div class="eyebrow"><span>${writing?'Writing · Task 2 · '+esc(q.category):'Speaking · Part '+q.part}　${esc(q.type||'')}</span><button id="copyQuestion" class="quiet">复制题目</button></div><div class="prompt">${esc(q.question)}</div>${q.questions?`<ol class="topic-questions">${q.questions.map(x=>`<li>${esc(x.question)}</li>`).join('')}</ol>`:''}${q.translation?`<p class="translation">${esc(q.translation)}</p>`:''}${q.cues?.length?`<ul class="cue">${q.cues.map(c=>`<li>${esc(c)}</li>`).join('')}</ul>`:''}</article><div class="columns"><section class="logic" ${q.questions?'hidden':''}>${writing?ideasEditor(q):'<details class="reference-logic"><summary>逻辑链与作答结构</summary>'}${editableLogic(q)}</details>${writing?'<div class="sample"><h3>使用我的作文模板</h3><select id="templateSelect" aria-label="选择模板"><option value="">选择已导入模板</option>'+state.templates.map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join('')+'</select><div id="templateFill"></div></div>':''}</section><section><h3>${writing?'写下你的作文':q.questions?'按题号记录这组回答':'写下或转写你的回答'}</h3><textarea id="draft" aria-label="我的回答" placeholder="${writing?'先沿逻辑链展开观点，再检查例子是否支持结论。':'可以直接输入，也可以录音后转成文字。'}">${esc(draft(q))}</textarea><div class="foot"><small>当前草稿自动保存在本机</small><span class="counter" id="count"></span></div><div class="tools"><button id="copyReview" class="primary">复制到 AI 核对</button><button id="askAI" ${apiBusy?'disabled':''}>提交</button></div>${!writing?`<div class="record"><div class="tools audio-tools"><button id="record">开始录音</button><button id="transcribe" disabled>录音转文字</button><button id="saveAudio" disabled>导出录音</button><button id="speak">朗读当前文字</button><button id="stopSpeech">停止朗读</button></div><p id="recordStatus" class="muted">录音暂存在当前窗口，导出后才保存为文件。</p><audio id="audio" controls hidden></audio></div>`:''}<div id="apiResult" class="result" aria-live="polite"></div>${q.answer?`<details class="sample"><summary>原创示范答案 · ${q.answer.split(/\s+/).length} 词</summary><small>${esc(q.answerSource)}</small><p class="answer">${esc(q.answer)}</p>${!writing?'<button id="readSample">朗读示范</button>':''}</details>`:'<p class="muted">本题未预置示范答案。可导入自己的语料，或复制题目到 AI 生成。</p>'}</section></div>`;
+ bindLogicEditors($('#question-view'));
+ const count=()=>$('#count').textContent=($('#draft').value.trim().match(/\S+/g)||[]).length+' words';count();
+ $('#draft').oninput=()=>{state.drafts[q.id]=$('#draft').value;save();count()};
+ $('#copyQuestion').onclick=()=>copy((q.questions?q.title+'\n'+q.questions.map((x,i)=>(i+1)+'. '+x.question).join('\n'):q.question)+(q.cues?.length?'\nYou should say:\n'+q.cues.join('\n'):''));
+ $('#copyReview').onclick=()=>copy(Core.review(questionWithLogic(q),$('#draft').value,state.ideas[q.id]||''));
+ $('#askAI').onclick=()=>reviewAPI(q);
+ if(writing){
+ $('#templateSelect').onchange=templateFill;
+ $('#ideas').oninput=()=>{state.ideas[q.id]=$('#ideas').value;save()};
+ $('#copyIdeas').onclick=()=>copy(Core.planPrompt(questionWithLogic(q),state.ideas[q.id]||''));
+ $('#completeIdeas').onclick=()=>completeIdeas(q);
+ }else{
+ $('#record').onclick=record;$('#transcribe').onclick=transcribe;$('#saveAudio').onclick=saveAudio;
+ $('#speak').onclick=()=>speak($('#draft').value);$('#stopSpeech').onclick=stopSpeech;if($('#readSample'))$('#readSample').onclick=()=>speak(q.answer);decorateAudioControls();syncAudio(q);
+ }
+}
+function templateFill(){const t=state.templates.find(t=>t.id===$('#templateSelect').value);if(!t){$('#templateFill').innerHTML='';return}const keys=Core.slots(t.text);$('#templateFill').innerHTML=`<div class="slot-fields">${keys.map((k,i)=>`<label>${esc(k)}<textarea class="slot" data-index="${i}" rows="2" aria-label="${esc(k)}"></textarea></label>`).join('')}</div><div class="template-preview" id="templatePreview"></div><button id="applyTemplate">填入当前作文</button>`;const values=()=>Object.fromEntries([...document.querySelectorAll('.slot')].map(el=>[keys[Number(el.dataset.index)],el.value]));const update=()=>$('#templatePreview').textContent=Core.fill(t.text,values());document.querySelectorAll('.slot').forEach(el=>el.oninput=update);update();$('#applyTemplate').onclick=async()=>{if($('#draft').value.trim()&&!await confirmAction('用模板内容替换当前草稿？'))return;$('#draft').value=Core.fill(t.text,values());$('#draft').dispatchEvent(new Event('input'));toast('已填入当前作文')}}
+function round(){
+ if(recorder?.state==='recording')return toast('请先停止录音');
+ const topics=Core.speakingCards(allSpeaking).filter(q=>q.part===1),picked=[];
+ while(topics.length&&picked.length<3)picked.push(topics.splice(Math.floor(Math.random()*topics.length),1)[0]);
+ const p2=Core.draw(allSpeaking.filter(q=>q.part===2));
+ const p3=Core.unique(p2?.followups||[]).slice(0,6),roundQs=[...picked,p2,...p3].filter(Boolean);
+ $('#round-view').innerHTML=`<section class="section sample"><h2>本次口语模拟题</h2><small>Part 1 三张话题卡 · Part 2 一张题卡 · Part 3 相关追问。Part 2 准备 1 分钟，作答 1–2 分钟。</small>${roundQs.map(q=>q.questions?`<article class="round-topic"><h3>Part 1 · ${esc(q.title)}</h3><ol class="topic-questions">${q.questions.map(x=>`<li>${esc(x.question)}</li>`).join('')}</ol></article>`:`<p><b>Part ${q.part}</b> ${esc(q.question)}</p>${q.cues?.length?'<ul>'+q.cues.map(c=>'<li>'+esc(c)+'</li>').join('')+'</ul>':''}`).join('')}<button id="copyRound">复制整组题目</button></section>`;
+ $('#copyRound').onclick=()=>copy(roundQs.map(q=>q.questions?'Part 1: '+q.title+'\n'+q.questions.map((x,i)=>(i+1)+'. '+x.question).join('\n'):`Part ${q.part}: ${q.question}\n${q.cues?.join('\n')||''}`).join('\n\n'));
+ $('#round-view').scrollIntoView({behavior:'smooth'});
+}
+
+async function record(){if(recorder?.state==='recording'){stopRecording();return}try{stream=await navigator.mediaDevices.getUserMedia({audio:true});const options=MediaRecorder.isTypeSupported('audio/webm;codecs=opus')?{mimeType:'audio/webm;codecs=opus'}:{};recorder=new MediaRecorder(stream,options);const chunks=[];recordingQuestion=current().id;audioBlob=null;if(audioURL)URL.revokeObjectURL(audioURL);audioURL=null;recorder.ondataavailable=e=>{if(e.data.size)chunks.push(e.data)};recorder.onstop=()=>{clearInterval(recordTimer);stream.getTracks().forEach(t=>t.stop());audioBlob=new Blob(chunks,{type:recorder.mimeType});audioURL=URL.createObjectURL(audioBlob);if(current()?.id===recordingQuestion&&$('#record')){syncAudio(current());setAudioIcon($('#record'),'mic','重新录音');$('#recordStatus').textContent='录音完成。可回放、导出或发送到配置的转写接口。';$('#recordStatus').classList.remove('recording')}};recorder.start();recordStart=Date.now();setAudioIcon($('#record'),'stop','停止录音');$('#recordStatus').classList.add('recording');$('#transcribe').disabled=true;$('#saveAudio').disabled=true;$('#audio').hidden=true;recordTimer=setInterval(()=>{const seconds=Math.floor((Date.now()-recordStart)/1000);$('#recordStatus').textContent=`正在录音 · ${Math.floor(seconds/60)}:${String(seconds%60).padStart(2,'0')}`;if(seconds>=600)stopRecording()},500)}catch(e){stream?.getTracks().forEach(t=>t.stop());toast('无法使用麦克风，请检查系统权限：'+e.message)}}
+function syncAudio(q){const exists=audioBlob&&recordingQuestion===q.id;$('#transcribe').disabled=!exists;$('#saveAudio').disabled=!exists;$('#audio').hidden=!exists;if(exists)$('#audio').src=audioURL}
+let speechRequest=0;
+function stopSpeech(){speechRequest++;speechSynthesis.cancel()}
+async function speechVoices(){
+ const voices=speechSynthesis.getVoices();if(voices.length)return voices;
+ return new Promise(resolve=>{let timer;const ready=()=>{const list=speechSynthesis.getVoices();if(list.length)finish(list)};const finish=list=>{clearTimeout(timer);speechSynthesis.removeEventListener('voiceschanged',ready);resolve(list)};speechSynthesis.addEventListener('voiceschanged',ready);timer=setTimeout(()=>finish(speechSynthesis.getVoices()),1800);ready()});
+}
+async function speak(text){
+ if(!text.trim())return toast('请先输入文字');
+ stopSpeech();const request=speechRequest;
+ const accent=state.speechAccent==='en-US'?'en-US':'en-GB';
+ const voices=await speechVoices();if(request!==speechRequest)return;
+ const matches=voices.filter(v=>v.lang.replace(/_/g,'-').toLowerCase()===accent.toLowerCase());
+ const voice=matches.find(v=>v.localService)||matches[0];
+ if(!voice)return toast('系统尚未安装'+(accent==='en-US'?'美式':'英式')+'英语语音，请安装后重启应用，或在设置里切换口音');
+ const u=new SpeechSynthesisUtterance(text);u.lang=accent;u.voice=voice;u.rate=.9;
+ u.onerror=e=>{if(!['interrupted','canceled'].includes(e.error))toast('系统朗读失败，请检查所选英语语音是否可用')};speechSynthesis.speak(u);
+}
+async function saveAudio(){if(!audioBlob)return;const bytes=Array.from(new Uint8Array(await audioBlob.arrayBuffer()));if(window.desktop){if(await desktop.saveRecording(bytes))toast('录音已导出')}else download(audioBlob,'speaking.webm')}
+function apiReady(){if(!window.desktop){toast('浏览器预览不发送 API 请求，请使用桌面版；仍可复制到 AI。');return false}if(!config.api_key&&!config.base_url){toast('请先在设置里填写密钥或本地服务地址；也可以复制到 AI。');return false}return true}
+async function reviewAPI(q){if(apiBusy||!apiReady())return;apiBusy=true;$('#askAI').disabled=true;$('#apiResult').textContent='正在生成并校验，失败最多重试一次…';const target=$('#apiResult');try{const text=await desktop.ai({config,task:'review',prompt:Core.review(questionWithLogic(q),draft(q),state.ideas[q.id]||'')});target.textContent=text}catch(e){target.textContent=e.message}finally{apiBusy=false;if($('#askAI'))$('#askAI').disabled=false}}
+async function transcribe(){if(!audioBlob||apiBusy||!apiReady())return;const id=recordingQuestion;if(!await confirmAction('将这段录音发送到你在设置中配置的服务进行转写？'))return;apiBusy=true;$('#transcribe').disabled=true;const previous=state.drafts[id]||'';try{const text=await desktop.ai({config,task:'transcribe',audio:Array.from(new Uint8Array(await audioBlob.arrayBuffer()))});state.drafts[id]=[state.drafts[id]||'',text].filter(Boolean).join('\n');save();if(current()?.id===id&&$('#draft')){$('#draft').value=state.drafts[id];$('#draft').dispatchEvent(new Event('input'))}toast('转写已追加到对应题目的草稿')}catch(e){toast(e.message)}finally{apiBusy=false;if($('#transcribe'))syncAudio(current())}}
+function download(blob,name){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}
+async function loadTemplateFile(f){if(!f)return;if(f.size>2e6)return toast('文件不能超过 2 MB');$('#templateText').value=await f.text();$('#templateName').value=f.name.replace(/\.(md|txt)$/i,'')}
+async function importMaterialFile(f){try{if(!f)return;if(f.size>2e6)throw Error('文件不能超过 2 MB');const rows=Core.imports(await f.text(),f.name);for(const q of rows){if(q.kind==='material')state.materials.push(q);else{state.custom.push(q);allSpeaking.push(q)}}save();library();toast('已导入 '+rows.length+' 条内容')}catch(e){toast(e.message)}}
+function library(){header('模板与语料','导入自己的内容；不包含原应用的表达卡或练习记录');$('#workspace').innerHTML=`<section class="section"><h2>作文模板</h2><p class="import-help">粘贴完整模板或导入 TXT / Markdown。用 <code>{{观点}}</code>、<code>{{原因}}</code> 等标出待填位置，其他句子会原样保留。写作页可逐空填写。</p><div class="template-demo"><h3>先试一个导入例子</h3><p class="muted">下载空白模板后从下方导入，或直接载入。填写示例使用收入差距题，展示每个空位如何展开。</p><div class="tools"><button id="loadTemplateExample">载入示例模板</button><button id="downloadTemplateExample">下载模板 TXT</button><button id="downloadFilledExample">下载填写示例</button></div><details><summary>查看填好后的完整例子</summary><p class="answer">${esc(TEMPLATE_EXAMPLE.filled)}</p></details></div><div class="fields"><label>模板名称<input id="templateName" placeholder="例如：双边讨论模板"></label><label>模板正文<textarea id="templateText" placeholder="Some people believe that {{观点一}}, while others argue that {{观点二}}."></textarea></label><label>导入模板文件<input type="file" id="templateFile" accept=".txt,.md"></label></div><button id="saveTemplate" class="primary">保存模板</button><div class="items">${state.templates.map(t=>`<div class="item"><b>${esc(t.name)}</b><small>${Core.slots(t.text).length} 个待填位置</small><div class="tools"><button data-export-template="${t.id}">导出</button><button data-delete-template="${t.id}">删除</button></div></div>`).join('')}</div></section><section class="section"><h2>口语题目与语料</h2><p class="import-help">JSON 可导入题目、答案和逻辑链；TXT / Markdown 作为独立语料保存。导入的题目会加入口语题库和抽题。</p><details><summary>查看 JSON 格式</summary><pre>${esc(JSON.stringify([{part:1,title:'Hobbies',question:'What do you do in your free time?',answer:'自定义英文回答',logic:['直接回答→原因→例子'],cues:[]}],null,2))}</pre></details><label>选择语料文件<input type="file" id="materialFile" accept=".json,.txt,.md"></label><div class="tools"><button id="exportCustom">导出自定义口语题目</button></div><div class="items">${state.custom.map(q=>`<div class="item"><b>Part ${q.part} · ${esc(q.title)}</b><p>${esc(q.question)}</p><button data-delete-question="${q.id}">删除</button></div>`).join('')}${state.materials.map(m=>`<div class="item"><details><summary>${esc(m.title)}</summary><pre>${esc(m.text)}</pre></details><div class="tools"><button data-copy-material="${m.id}">复制语料</button><button data-delete-material="${m.id}">删除</button></div></div>`).join('')}</div></section>`;
+ $('#loadTemplateExample').onclick=()=>{$('#templateName').value=TEMPLATE_EXAMPLE.name;$('#templateText').value=TEMPLATE_EXAMPLE.text;toast('示例已载入，点击保存模板即可在写作页填空')};$('#downloadTemplateExample').onclick=()=>download(new Blob([TEMPLATE_EXAMPLE.text],{type:'text/plain;charset=utf-8'}),'writing-template.txt');$('#downloadFilledExample').onclick=()=>download(new Blob([TEMPLATE_EXAMPLE.filled],{type:'text/plain;charset=utf-8'}),'writing-template-filled.txt');
+ $('#templateFile').onchange=async e=>loadTemplateFile(e.target.files[0]);
+ if(window.desktop?.openTextFile)$('#templateFile').onclick=async e=>{e.preventDefault();try{const f=await desktop.openTextFile('template');if(f)loadTemplateFile({...f,text:async()=>f.text})}catch(e){toast(e.message)}};
+
+ $('#saveTemplate').onclick=()=>{const name=$('#templateName').value.trim(),text=$('#templateText').value;if(!name||!text.trim())return toast('请填写模板名称和正文');state.templates.push({id:'tpl-'+Date.now(),name,text});save();library();toast('模板已保存，可在写作页使用')};
+ $('#materialFile').onchange=async e=>importMaterialFile(e.target.files[0]);
+ if(window.desktop?.openTextFile)$('#materialFile').onclick=async e=>{e.preventDefault();try{const f=await desktop.openTextFile('material');if(f)await importMaterialFile({...f,text:async()=>f.text})}catch(e){toast(e.message)}};
+
+ document.querySelectorAll('[data-delete-template]').forEach(b=>b.onclick=async()=>{if(!await confirmAction('删除这个模板？'))return;state.templates=state.templates.filter(t=>t.id!==b.dataset.deleteTemplate);save();library()});
+ document.querySelectorAll('[data-export-template]').forEach(b=>b.onclick=()=>{const t=state.templates.find(t=>t.id===b.dataset.exportTemplate);download(new Blob([t.text],{type:'text/plain'}),t.name+'.txt')});
+ document.querySelectorAll('[data-delete-question]').forEach(b=>b.onclick=async()=>{if(!await confirmAction('删除这道自定义题目及其草稿？'))return;const id=b.dataset.deleteQuestion;state.custom=state.custom.filter(q=>q.id!==id);const i=allSpeaking.findIndex(q=>q.id===id);if(i>=0)allSpeaking.splice(i,1);delete state.drafts[id];save();library()});
+ document.querySelectorAll('[data-delete-material]').forEach(b=>b.onclick=async()=>{if(!await confirmAction('删除这份语料？'))return;state.materials=state.materials.filter(q=>q.id!==b.dataset.deleteMaterial);save();library()});
+ document.querySelectorAll('[data-copy-material]').forEach(b=>b.onclick=()=>copy(state.materials.find(q=>q.id===b.dataset.copyMaterial).text));
+ $('#exportCustom').onclick=()=>download(new Blob([JSON.stringify(state.custom.map(q=>({part:q.part,title:q.title,question:q.question,answer:q.answer,logic:q.logic.chains,cues:q.cues})),null,2)],{type:'application/json'}),'speaking-materials.json');
+}
+function settings(){header('设置','v'+(window.desktop?.version||'0.2.3')+' · 推荐配置 API 接口');$('#workspace').innerHTML=`<section class="section"><h2>朗读设置</h2><label>英语口音<select id="speechAccent"><option value="en-GB" ${state.speechAccent!=='en-US'?'selected':''}>英式英语 · British English</option><option value="en-US" ${state.speechAccent==='en-US'?'selected':''}>美式英语 · American English</option></select></label><p class="muted">切换后自动保存，朗读回答和示范答案都使用此口音。需要系统已安装对应英语语音。</p><div class="tools"><button id="previewSpeech">试听</button><button id="stopPreview">停止试听</button></div></section><section class="section"><h2>本地模型（自行部署）</h2><p class="muted">推荐使用 API 接口。本地模型仅供自行部署，安装时不启用、不下载。先安装并启动 Ollama，再选择模型。4B 是本地推荐选项；设备不足或速度不合适时，可配置 API 或复制到大模型。</p><label>选择本地模型<select id="localModelChoice"><option value="qwen3.5:4b">Qwen3.5-4B · 推荐</option><option value="qwen3:8b">Qwen3-8B</option><option value="qwen3.5:9b">Qwen3.5-9B</option></select></label><p id="localModelRequirements" class="muted"></p><div class="tools"><button id="downloadLocalQwen">下载所选模型</button><button id="useLocalQwen">启用所选模型</button><button id="testLocalQwen">测试所选模型</button></div><p id="localQwenStatus" class="muted" role="status"></p><p class="muted">建议配置不是最低保证；CPU 可尝试但可能很慢。本地模型不支持录音转写。自动校验不能保证内容正确。</p></section><section class="section"><h2>API 接口（推荐）</h2><div class="fields"><label>base_url（可为空）<input id="base" placeholder="https://api.openai.com/v1" value="${esc(config.base_url)}"></label><label>api_key（可为空，仅本次打开有效）<input id="key" type="password" autocomplete="off" value="${esc(config.api_key)}" placeholder="本地免密服务可留空"></label><div class="field-row"><label>文字模型<input id="model" value="${esc(config.model)}" placeholder="gpt-4o-mini"></label><label>转写模型<input id="transcriptionModel" value="${esc(config.transcription_model)}" placeholder="whisper-1"></label></div></div><p class="note">地址留空时使用默认 API 地址。密钥留空适用于无需认证的本地服务。文字核对会发送当前题目、逻辑链和回答；录音仅在点击转写并确认后发送。请填写服务支持的模型名称。</p><button id="saveSettings" class="primary">保存设置</button>${!window.desktop?'<p class="screen-only">当前为浏览器预览，API 核对与转写请使用桌面版。</p>':''}</section><section class="section"><h2>数据说明</h2><p class="muted">模板、导入语料和草稿仅保存在此版本的本地存储中。密钥不写入磁盘。没有打卡、成绩记录或表达卡模块。录音需主动导出。</p><div class="tools"><button id="clearDrafts" class="danger">清空此版本的草稿</button></div></section>`;
+ const requirements={'qwen3.5:4b':'下载约 3.3–4 GB；建议 16 GB 内存，Mac Apple Silicon 或 Windows 6 GB 以上可用显存；预留 8 GB 磁盘。','qwen3:8b':'下载约 5.2 GB；建议 24 GB 内存，Mac Apple Silicon 或 Windows 8 GB 以上可用显存；预留 12 GB 磁盘。','qwen3.5:9b':'下载约 6.6–7.6 GB；建议 24–32 GB 内存，Mac Apple Silicon 或 Windows 12 GB 以上可用显存；预留 16 GB 磁盘。'};
+ if(requirements[config.model])$('#localModelChoice').value=config.model;
+ $('#localModelChoice').onchange=()=>{$('#localModelRequirements').textContent=requirements[$('#localModelChoice').value]};$('#localModelChoice').onchange();
+ $('#downloadLocalQwen').onclick=async()=>{const button=$('#downloadLocalQwen'),status=$('#localQwenStatus');if(!window.desktop){status.textContent='请在桌面插件中下载模型。';return}button.disabled=true;try{let result=await desktop.downloadLocalModel($('#localModelChoice').value);status.textContent=result.message;while(result.phase==='downloading'&&status.isConnected){await new Promise(resolve=>setTimeout(resolve,1000));result=await desktop.localModelStatus();status.textContent=result.message}}catch(e){status.textContent=e.message}finally{button.disabled=false}};
+ $('#useLocalQwen').onclick=()=>{config={...config,base_url:'http://127.0.0.1:11434/v1',api_key:'',model:$('#localModelChoice').value};state.settings={base_url:config.base_url,model:config.model,transcription_model:config.transcription_model};save();$('#base').value=config.base_url;$('#key').value='';$('#model').value=config.model;$('#localQwenStatus').textContent='已启用 '+config.model+'。如未部署成功，请使用 API 或复制到大模型。'};
+ $('#testLocalQwen').onclick=async()=>{const button=$('#testLocalQwen'),status=$('#localQwenStatus');if(!window.desktop){status.textContent='请在桌面插件中测试本地模型。';return}button.disabled=true;status.textContent='正在测试所选模型…';const start=performance.now();try{const result=await desktop.ai({config:{base_url:'http://127.0.0.1:11434/v1',model:$('#localModelChoice').value},task:'probe',prompt:'Reply with exactly: Ready'});status.textContent=`模型已响应（${((performance.now()-start)/1000).toFixed(1)} 秒）：${result}`}catch(e){status.textContent='无法测试：'+e.message}finally{button.disabled=false}};
+ wordImportSettings();
+ reminderSettings();
+ $('#speechAccent').onchange=e=>{stopSpeech();state.speechAccent=e.target.value;save();toast('朗读口音已保存')};$('#previewSpeech').onclick=()=>speak('I usually spend my free time reading books and exploring new places.');$('#stopPreview').onclick=stopSpeech;
+ $('#saveSettings').onclick=()=>{config={base_url:$('#base').value.trim(),api_key:$('#key').value.trim(),model:$('#model').value.trim(),transcription_model:$('#transcriptionModel').value.trim()};state.settings={base_url:config.base_url,model:config.model,transcription_model:config.transcription_model};save();toast('设置已保存；密钥仅在本次打开期间有效')};$('#clearDrafts').onclick=async()=>{if(await confirmAction('清空所有作文、口语和逻辑链草稿？')){state.drafts={};state.ideas={};save();toast('草稿已清空')}};
+}
+window.addEventListener('beforeunload',()=>{stream?.getTracks().forEach(t=>t.stop());speechSynthesis.cancel()});
+render();
+
+window.desktop?.onOpenVocabulary(()=>changePage('vocabulary'));
