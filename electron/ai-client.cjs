@@ -13,6 +13,13 @@ async function ai({config,task,prompt,audio},onStage){
   if(!response.ok){if(local&&response.status===404)throw permanent('本地未部署所选模型，请先部署；也可使用 API 或复制到大模型。');const error=Error(`接口返回 ${response.status}，请检查地址、密钥、模型和额度。`);error.retryable=response.status===429||response.status>=500;throw error}
   return response.json();
  }
+ if(task==='models'){
+  let response;try{response=await fetch(base+'/models',{headers,redirect:'error',signal:AbortSignal.timeout(20000)})}catch{throw Error('无法获取模型列表，请检查地址和网络。')}
+  if(!response.ok)throw permanent(`接口返回 ${response.status}，无法获取模型列表。请检查地址和密钥，或手动填写模型。`);
+  const data=await response.json().catch(()=>null);const list=Array.isArray(data?.data)?data.data:Array.isArray(data?.models)?data.models:null;
+  if(!list)throw permanent('该服务没有提供模型列表，请手动填写模型。');
+  return [...new Set(list.map(m=>typeof m==='string'?m:m?.id||m?.name).filter(id=>typeof id==='string'&&id&&id.length<200))].slice(0,1000);
+ }
  if(task==='transcribe'){
   if(local)throw permanent('所选 Qwen 模型不支持录音转写。请配置转写服务。');
   if(!audio?.length||audio.length>30e6)throw permanent('录音为空或超过 30 MB');
