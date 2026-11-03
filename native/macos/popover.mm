@@ -29,13 +29,14 @@
   self.popover.contentSize=size;
   // Give the web content its final size before the popover appears; resizing it afterwards made the page reflow and visibly drop.
   [self.glass setFrameSize:size];self.content.frame=self.glass.bounds; // size only: the popover owns where its content view sits
-  [NSApp activateIgnoringOtherApps:YES];
+  // activateIgnoringOtherApps is deprecated and can be ignored since macOS 14, leaving the popover behind other apps.
+  if(@available(macOS 14.0,*))[NSApp activate];else [NSApp activateIgnoringOtherApps:YES];
   [self.popover showRelativeToRect:b.bounds ofView:b preferredEdge:NSMinYEdge];
   // macOS 26 first places the popover a few points into the menu bar and moves it down about 0.1s later; put it at the final place now so nothing moves.
   NSWindow *pw=self.popover.contentViewController.view.window;CGFloat overlap=NSMaxY(pw.frame)-NSMinY(b.window.frame);
   if(overlap>0&&overlap<12){NSRect f=pw.frame;f.origin.y-=overlap;[pw setFrame:f display:NO];}
   NSWindow *w=self.popover.contentViewController.view.window;
-  w.level=NSFloatingWindowLevel;
+  w.level=NSFloatingWindowLevel;[w orderFrontRegardless]; // visible even if activation has not happened yet
   [w makeKeyWindow]; [w makeFirstResponder:self.content];
   [self notify:@"show"];
 }
