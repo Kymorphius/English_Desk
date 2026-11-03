@@ -66,6 +66,20 @@ handle('open-text-file',kind=>standaloneDialog(async()=>{
 handle('save-recording',async bytes=>{if(!Array.isArray(bytes)||bytes.length>30e6)throw Error('录音过大');return standaloneDialog(async()=>{const r=nativePanel?{filePath:nativePanel.selectFile('recording')}:await dialog.showSaveDialog({defaultPath:'speaking.webm',filters:[{name:'WebM audio',extensions:['webm']}]});if(r.canceled||!r.filePath)return false;await fs.writeFile(r.filePath,Buffer.from(bytes));return true})});
 const {ai}=require('./ai-client.cjs');
 handle('ai',payload=>ai(payload));
+// Boss key: a global shortcut that hides the panel at once (and stops speech), or brings it back.
+const {globalShortcut}=require('electron');
+const bossKeyPath=path.join(app.getPath('userData'),'boss-key.json');
+let bossKey='Alt+`',bossKeyActive=false;
+function bossToggle(){if(quitting||!win)return;const shown=nativePanel?JSON.parse(nativePanel.inspect()).shown:win.isVisible();if(!shown)return showPanel();win.webContents.send('boss-key');if(nativePanel)nativePanel.hide();else win.hide()}
+function registerBossKey(key){if(bossKeyActive)globalShortcut.unregister(bossKey);bossKeyActive=false;if(!key)return true;try{bossKeyActive=globalShortcut.register(key,bossToggle)}catch{bossKeyActive=false}return bossKeyActive}
+const validBossKey=key=>key===''||(key.length<=40&&/^((Command|Control|Alt|Shift)\+)+[^+]+$/.test(key)&&/(Command|Control|Alt)\+/.test(key));
+handle('get-boss-key',()=>({key:bossKey,active:bossKeyActive}));
+handle('pause-boss-key',paused=>{if(paused){if(bossKeyActive)globalShortcut.unregister(bossKey);bossKeyActive=false}else registerBossKey(bossKey);return {key:bossKey,active:bossKeyActive}});
+handle('set-boss-key',async key=>{key=key==null?'':String(key);if(!validBossKey(key))throw Error('老板键需要包含 ⌘、⌃ 或 ⌥ 中的至少一个');const prev=bossKey;
+ if(!registerBossKey(key)){bossKey=prev;registerBossKey(prev);throw Error('这个组合已被其他应用占用，请换一个')}
+ bossKey=key;await fs.mkdir(app.getPath('userData'),{recursive:true});await fs.writeFile(bossKeyPath,JSON.stringify({key}));return {key,active:bossKeyActive}});
+app.on('will-quit',()=>globalShortcut.unregisterAll());
+app.whenReady().then(async()=>{try{const saved=JSON.parse(await fs.readFile(bossKeyPath,'utf8')).key;if(typeof saved==='string'&&validBossKey(saved))bossKey=saved}catch{}registerBossKey(bossKey);if(process.env.ENGLISH_DESK_TEST==='1')app.testBossToggle=bossToggle});
 app.whenReady().then(async()=>{
  await fs.mkdir(app.getPath('userData'),{recursive:true});await reminders.load();
  const updatePref=path.join(app.getPath('userData'),'updates.json');
