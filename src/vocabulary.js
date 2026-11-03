@@ -15,17 +15,21 @@ function vocabulary(){
   const options={algorithm:v.algorithm,retention:v.retention},q=Vocab.queue(words,v.progress,v.limit),w=q[0];const box=$('#wordCard');
   if(!w){box.innerHTML='<p>当前没有待学单词。已完成今日新词或复习，稍后再来看。</p><button id="refreshWords">刷新复习</button>';$('#refreshWords').onclick=showWord;return}
   const prior=v.progress[Vocab.key(w.word)],grades=[['again','重来'],['hard','困难'],['good','记得'],['easy','简单'],['mastered','精通']];
-  box.innerHTML=`<p class="vocab-meta">${prior?'复习':'新词'} · 本轮还剩 ${q.length}</p><div class="vocab-head"><h2 class="vocab-word">${esc(w.word)}</h2><button id="speakWord" class="quiet vocab-speak" title="朗读单词（R）" aria-label="朗读单词">🔊</button></div><p class="vocab-phonetic">${esc((state.speechAccent==='en-US'?w.us:w.uk)||'')}</p><button id="flipWord" class="primary vocab-flip">显示答案 <kbd>空格</kbd></button><div id="wordBack" hidden><p class="vocab-meaning">${esc(w.meaning)}</p>${w.example?`<p class="vocab-example">${esc(w.example)}</p>`:''}${w.translation?`<p class="muted">${esc(w.translation)}</p>`:''}<div class="vocab-grades">${grades.map(([r,t],i)=>`<button data-grade="${r}" class="grade-${r}" title="${t}（${i+1}）"><span class="grade-key">${i+1}</span><strong>${t}</strong><small>${r==='mastered'?'1 个月':intervalText(Vocab.grade(prior,r,Date.now(),options).interval)}</small></button>`).join('')}</div></div>`;
+  box.innerHTML=`<p class="vocab-meta">${prior?'复习':'新词'} · 本轮还剩 ${q.length}</p><div class="vocab-head"><h2 class="vocab-word">${esc(w.word)}</h2><button id="speakWord" class="quiet vocab-speak" title="朗读单词（R）" aria-label="朗读单词">🔊</button></div><p class="vocab-phonetic">${esc((state.speechAccent==='en-US'?w.us:w.uk)||'')}</p><button id="flipWord" class="primary vocab-flip">显示答案 <kbd>空格</kbd></button><div id="wordBack" hidden><p class="vocab-meaning">${esc(w.meaning)}</p>${w.example?`<p class="vocab-example">${esc(w.example)}</p>`:''}${w.translation?`<p class="muted">${esc(w.translation)}</p>`:''}<div class="vocab-grades">${grades.map(([r,t],i)=>`<div class="grade"><small>${r==='mastered'?'1 个月':intervalText(Vocab.grade(prior,r,Date.now(),options).interval)}</small><button data-grade="${r}" class="grade-${r}" title="${t}（按 ${i+1}）"><span class="grade-key">${i+1}</span>${t}</button></div>`).join('')}</div></div>`;
   $('#speakWord').onclick=()=>speak(w.word);$('#flipWord').onclick=()=>{$('#wordBack').hidden=false;$('#flipWord').hidden=true};
   box.querySelectorAll('[data-grade]').forEach(b=>b.onclick=()=>{v.progress[Vocab.key(w.word)]=Vocab.grade(v.progress[Vocab.key(w.word)],b.dataset.grade,Date.now(),options);save();showWord()});
  }showWord();
 }
 // Keyboard review: Space/Enter flips the card, 1–5 grade it, R reads the word aloud.
+// Chromium treats any focused element as keyboard-focused once a key is pressed, so track how focus arrived.
+let tabFocus=false;document.addEventListener('pointerdown',()=>{tabFocus=false},true);
 document.addEventListener('keydown',e=>{
+ if(e.key==='Tab'){tabFocus=true;return}
  if(page!=='vocabulary'||e.metaKey||e.ctrlKey||e.altKey||e.repeat||document.querySelector('.select-menu'))return;
  const t=e.target;if(t.closest?.('input,textarea,select,[contenteditable="true"]'))return;
  const back=$('#wordBack');if(!back)return;
- if((e.key===' '||e.key==='Enter')&&t.tagName==='BUTTON'&&t.id!=='flipWord')return; // a focused button keeps its standard activation
+ if((e.key===' '||e.key==='Enter')&&t.tagName==='BUTTON'&&t.id!=='flipWord'&&tabFocus)return; // a button reached with Tab keeps its standard activation
+ if(t.tagName==='BUTTON'&&/^([ 1-5rR]|Enter)$/.test(e.key))t.blur(); // otherwise the button also fires on keyup
  if((e.key===' '||e.key==='Enter')&&back.hidden){e.preventDefault();$('#flipWord').click()}
  else if(/^[1-5]$/.test(e.key)&&!back.hidden){e.preventDefault();back.querySelectorAll('[data-grade]')[Number(e.key)-1]?.click()}
  else if(e.key==='r'||e.key==='R'){e.preventDefault();$('#speakWord')?.click()}
