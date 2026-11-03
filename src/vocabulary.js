@@ -85,7 +85,7 @@ function vocabulary(){
 let lastRing=null;
 function paintRing(){const segs=[...document.querySelectorAll('.vocab-progress [data-bar]')];if(!segs.length)return;const now=Object.fromEntries(segs.map(x=>[x.dataset.bar,+x.dataset.w]));
  segs.forEach(x=>{x.style.width=(lastRing?.[x.dataset.bar]??(lastRing?0:now[x.dataset.bar]))+'%'});
- if(lastRing){segs[0].getBoundingClientRect();segs.forEach(x=>{const id=x.dataset.bar;x.style.width=now[id]+'%';if(now[id]!==(lastRing[id]??0))x.parentElement.classList.add('grew')})}
+ if(lastRing){segs[0].getBoundingClientRect();segs.forEach(x=>{const id=x.dataset.bar;x.style.width=now[id]+'%';})}
  lastRing=now}
 let linkReturn=null,wordTimer,lastOverall=null,lastToday=null,showFirst=null,undoGrade=null;const undoStack=[];
 function syncUndoButton(){const b=$('#vocabUndo');if(!b)return;b.querySelector('kbd').textContent=Vocab.keyLabel(state.vocab.keys.undo);const last=undoStack.at(-1);b.disabled=!last;b.title=last?`撤销「${last.word}：${last.label}」（${Vocab.keyLabel(state.vocab.keys.undo)}）`:'没有可撤销的评分';b.setAttribute('aria-label',last?`撤销 ${last.word} 的评分`:'撤销')}
