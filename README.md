@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="src/assets/logo.png" width="144" alt="English Desk Studio Logo">
+  <img src="https://github.com/Vienky/English_Desk/blob/main/src/assets/logo.png?raw=true" width="144" alt="English Desk Studio Logo">
 </p>
 <h1 align="center">English Desk Studio</h1>
 <p align="center">雅思写作与口语练习插件 · macOS 菜单栏 / Windows 系统托盘</p>
@@ -28,7 +28,9 @@
 
 | 版本 | 本版内容 |
 | --- | --- |
-| **0.2.5** | 写作题库按题型与主题去重，从 261 道精简至 130 道，保留 6 种题型与全部主题分类。 |
+| 0.2.7 | 合并 API 服务商预设、模型列表与密钥保存功能，保留自动更新。 |
+| **0.2.6** | 新增自动检查更新；Windows 支持后台下载后重启安装，Mac 提供新版下载入口；图片改用明确的仓库链接。 |
+| 0.2.5 | 写作题库按题型与主题去重，从 261 道精简至 130 道，保留 6 种题型与全部主题分类。 |
 | 0.2.4 | 全部内置逻辑链统一为单段箭头形式，例子与表达默认折叠；API 与复制提示词同步改为简短逻辑链。 |
 | 0.2.3 | 未连接模型时，补全逻辑链按钮明确提示并提供设置入口，不再自动复制；更新记录按日期分组。 |
 | 0.2.2 | 单词导入移至设置，背词页右下角增加入口；新增精通评分，每月复习一次。 |
@@ -40,7 +42,7 @@
 
 ## 背单词
 
-<img src="docs/images/vocabulary-panel.png" width="380" alt="0.2.2 背词卡片，显示答案后按记忆程度评分">
+<img src="https://github.com/Vienky/English_Desk/blob/main/docs/images/vocabulary-panel.png?raw=true" width="380" alt="0.2.2 背词卡片，显示答案后按记忆程度评分">
 
 在顶部选择 **背单词**，先回忆词义再点 **显示答案**。点击 🔊 朗读当前单词，口音跟随设置中的英式／美式选择。按重来、困难、记得、简单、精通安排下次复习。精通按自然月安排，下一月无对应日期时取月末；再次选择精通仍是一个月后复习。其他评分按记忆程度调整间隔；默认每天 20 个新词，可调整为 1–500 个。到期复习不占新词数量，学习进度保存在本机。重来约 1 分钟后再出现，可点击刷新复习。
 
@@ -61,7 +63,7 @@ CSV/TSV 按单词、释义、例句三列排列，例句选填。首行可为 `w
 主界面是点击图标展开的小面板。macOS 使用原生下拉面板与灰白磨砂玻璃背景，点击外部或按 Esc 收起；开启置顶后，点击外部保持展开。
 
 <p align="center">
-  <img src="docs/images/native-popover.png" width="440" alt="macOS 原生菜单栏插件展开后的面板，带顶部箭头与磨砂玻璃背景">
+  <img src="https://github.com/Vienky/English_Desk/blob/main/docs/images/native-popover.png?raw=true" width="440" alt="macOS 原生菜单栏插件展开后的面板，带顶部箭头与磨砂玻璃背景">
 </p>
 
 以下练习截图来自 0.1.3；背词功能见上文 0.2.0 更新。Windows 从系统托盘展开，共用练习功能；窗口外观以 Windows 实际运行效果为准。
@@ -69,18 +71,18 @@ CSV/TSV 按单词、释义、例句三列排列，例句选填。首行可为 `w
 <table>
   <tr><th>写作：先写自己的逻辑链</th><th>口语：每题独立展开</th></tr>
   <tr>
-    <td><img src="docs/images/writing-panel.png" width="380" alt="写作抽题与自己的逻辑链输入区，参考默认折叠"></td>
-    <td><img src="docs/images/speaking-panel.png" width="380" alt="Part 1 话题卡，每题分别展开录音与作答和参考回答"></td>
+    <td><img src="https://github.com/Vienky/English_Desk/blob/main/docs/images/writing-panel.png?raw=true" width="380" alt="写作抽题与自己的逻辑链输入区，参考默认折叠"></td>
+    <td><img src="https://github.com/Vienky/English_Desk/blob/main/docs/images/speaking-panel.png?raw=true" width="380" alt="Part 1 话题卡，每题分别展开录音与作答和参考回答"></td>
   </tr>
   <tr><th>参考回答可以编辑</th><th>逻辑链与结构可以编辑</th></tr>
   <tr>
-    <td><img src="docs/images/reference-editor.png" width="380" alt="Part 1 参考回答编辑入口，按题目自动保存"></td>
-    <td><img src="docs/images/logic-editor.png" width="380" alt="自定义立场、作答结构、逻辑链、例子与表达"></td>
+    <td><img src="https://github.com/Vienky/English_Desk/blob/main/docs/images/reference-editor.png?raw=true" width="380" alt="Part 1 参考回答编辑入口，按题目自动保存"></td>
+    <td><img src="https://github.com/Vienky/English_Desk/blob/main/docs/images/logic-editor.png?raw=true" width="380" alt="自定义立场、作答结构、逻辑链、例子与表达"></td>
   </tr>
   <tr><th>导入自己的模板与语料</th><th>面板内切换英美口音</th></tr>
   <tr>
-    <td><img src="docs/images/import-panel.png" width="380" alt="作文模板导入与可填空的示例模板"></td>
-    <td><img src="docs/images/settings-panel.png" width="380" alt="展开的英式与美式英语选项，以及可选 AI 接口设置"></td>
+    <td><img src="https://github.com/Vienky/English_Desk/blob/main/docs/images/import-panel.png?raw=true" width="380" alt="作文模板导入与可填空的示例模板"></td>
+    <td><img src="https://github.com/Vienky/English_Desk/blob/main/docs/images/settings-panel.png?raw=true" width="380" alt="展开的英式与美式英语选项，以及可选 AI 接口设置"></td>
   </tr>
 </table>
 
@@ -102,6 +104,14 @@ CSV/TSV 按单词、释义、例句三列排列，例句选填。首行可为 `w
 | AI 核对 | 复制题目与回答到任意 AI；也可通过兼容接口直接核对 |
 | 插件面板 | macOS 菜单栏、Windows 通知区域入口；无标题栏浮层，点击外部收起，支持置顶 |
 | 本地草稿 | 自动保存当前回答、导入语料和模板，不累计打卡或成绩记录 |
+
+## 应用更新
+
+先手动安装一次 **0.2.6 或更高版本**，旧版本无法自行获得更新功能。之后默认启动时及每 6 小时检查 GitHub Releases，可在设置 → 应用更新中关闭或手动检查。
+
+- Windows：发现新版后后台下载，完成后点击 **重启并安装**；不会在练习过程中自动退出。更新包由 electron-updater 校验。
+- macOS：自动检查并提示新版，点击 **下载新版** 后下载安装包并替换应用。当前未正式签名，暂不支持静默替换；[Electron 的 Mac 自动更新需要有效签名](https://www.electronjs.org/docs/latest/tutorial/code-signing)。
+- 更新不主动删除本机练习数据。联网失败时保留当前版本，可重试或打开下载页面。
 
 ## 下载安装
 
@@ -126,13 +136,13 @@ CSV/TSV 按单词、释义、例句三列排列，例句选填。首行可为 `w
 先按步骤进入下载区域：
 
 <p align="center">
-  <img src="docs/images/download-guide.png" width="760" alt="步骤图：点击成功的 Desktop builds，选择 Summary 并向下滚动至 Artifacts">
+  <img src="https://github.com/Vienky/English_Desk/blob/main/docs/images/download-guide.png?raw=true" width="760" alt="步骤图：点击成功的 Desktop builds，选择 Summary 并向下滚动至 Artifacts">
 </p>
 
 找到 Artifacts 后，点击对应系统右侧的下载按钮：
 
 <p align="center">
-  <img src="docs/images/artifacts-download.png" width="760" alt="Artifacts 下载入口：红色箭头分别指向 macOS 和 Windows 行最右侧的下载按钮">
+  <img src="https://github.com/Vienky/English_Desk/blob/main/docs/images/artifacts-download.png?raw=true" width="760" alt="Artifacts 下载入口：红色箭头分别指向 macOS 和 Windows 行最右侧的下载按钮">
 </p>
 
 截图以第 7 次构建演示页面位置；下载时选择近期成功的构建，旧构建不包含之后新增的功能。构建产物有保存期限，过期后需选择新的构建。
@@ -204,7 +214,7 @@ ps: 老板什么时候回头不归本插件管噢～（免责声明）
 下面是同一台电脑的显示示例：笔记本屏幕上没有看到插件图标，外接显示屏上可以看到。红色箭头标出的书本图标就是 **English Desk Studio**。显示情况取决于菜单栏可用空间和图标数量，并非所有笔记本都会隐藏图标。
 
 <p align="center">
-  <img src="docs/images/menubar-visibility.png" width="900" alt="笔记本与外接显示屏的菜单栏对比，红色箭头标出 English Desk Studio 书本图标">
+  <img src="https://github.com/Vienky/English_Desk/blob/main/docs/images/menubar-visibility.png?raw=true" width="900" alt="笔记本与外接显示屏的菜单栏对比，红色箭头标出 English Desk Studio 书本图标">
 </p>
 
 1. **先腾出位置**：临时退出几个菜单栏应用，或在它们各自的设置里隐藏菜单栏图标。使用了图标隐藏工具时，先展开它隐藏的区域。

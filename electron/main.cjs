@@ -1,4 +1,4 @@
-const {app,BrowserWindow,ipcMain,session,clipboard,dialog,Tray,Menu,nativeImage,screen,Notification,safeStorage}=require('electron');
+const {app,BrowserWindow,ipcMain,session,clipboard,dialog,Tray,Menu,nativeImage,screen,Notification,safeStorage,shell}=require('electron');
 const path=require('node:path');const fs=require('node:fs/promises');
 app.setName('English Desk Studio');
 if(process.platform==='win32')app.setAppUserModelId('com.vienky.englishdesk.studio');
@@ -41,6 +41,13 @@ const reminders=require('./word-reminder.cjs').createReminder(path.join(app.getP
 });
 handle('get-word-reminder',()=>reminders.get());
 handle('set-word-reminder',p=>reminders.set(p));
+let appUpdates;
+handle('app-update-state',()=>appUpdates.snapshot());
+handle('app-update-check',()=>appUpdates.check());
+handle('app-update-download',()=>appUpdates.download());
+handle('app-update-install',()=>appUpdates.install());
+handle('app-update-auto',enabled=>appUpdates.setEnabled(enabled));
+handle('app-update-releases',()=>appUpdates.openRelease());
 handle('copy',text=>clipboard.writeText(String(text)));
 const localModel=require('./local-model.cjs');
 handle('download-local-model',model=>localModel.start(model));
@@ -61,6 +68,16 @@ const {ai}=require('./ai-client.cjs');
 handle('ai',payload=>ai(payload));
 app.whenReady().then(async()=>{
  await fs.mkdir(app.getPath('userData'),{recursive:true});await reminders.load();
+ const updatePref=path.join(app.getPath('userData'),'updates.json');
+ appUpdates=require('./app-updates.cjs').createUpdates({platform:process.platform,version:app.getVersion(),isPackaged:app.isPackaged,
+  engine:process.platform==='win32'?require('electron-updater').autoUpdater:null,
+  fetchRelease:async()=>{const r=await fetch('https://api.github.com/repos/Vienky/English_Desk/releases/latest',{headers:{Accept:'application/vnd.github+json'},signal:AbortSignal.timeout(15000)});if(!r.ok)throw Error('Update check failed');return r.json()},
+  openDownload:url=>shell.openExternal(url),beforeInstall:()=>{quitting=true},
+  loadPreference:async()=>JSON.parse(await fs.readFile(updatePref,'utf8')).enabled,
+  savePreference:enabled=>fs.writeFile(updatePref,JSON.stringify({enabled})),
+  onChange:s=>{if(win&&!win.isDestroyed())win.webContents.send('app-update-status',s)}
+ });await appUpdates.init();
+ if(process.env.ENGLISH_DESK_TEST!=='1'){setTimeout(()=>appUpdates.check(true),15000).unref();setInterval(()=>appUpdates.check(true),6*60*60*1000).unref();}
  setInterval(()=>reminders.tick().catch(console.error),15000).unref();
  try{pinned=JSON.parse(await fs.readFile(preferencePath,'utf8')).pinned===true}catch{}
  session.defaultSession.setPermissionRequestHandler((contents,permission,callback,details)=>callback(contents===win?.webContents&&permission==='media'&&!(details.mediaTypes||[]).includes('video')));

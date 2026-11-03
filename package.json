@@ -1,7 +1,7 @@
 {
   "name": "english-desk-clean",
   "productName": "English Desk Studio",
-  "version": "0.2.5",
+  "version": "0.2.7",
   "private": true,
   "description": "Independent IELTS writing and speaking practice",
   "author": "Vienky",
@@ -71,6 +71,16 @@
     },
     "asarUnpack": [
       "native/macos/*.node"
-    ]
+    ],
+    "publish": {
+      "provider": "github",
+      "owner": "Vienky",
+      "repo": "English_Desk",
+      "releaseType": "release"
+    },
+    "artifactName": "English-Desk-Studio-${version}-${arch}.${ext}"
+  },
+  "dependencies": {
+    "electron-updater": "6.8.11"
   }
 }
