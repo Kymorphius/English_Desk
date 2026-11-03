@@ -88,8 +88,10 @@
  const keyPreset=bindings=>Object.keys(KEY_PRESETS).find(p=>KEY_ACTIONS.every(a=>KEY_PRESETS[p][a]===bindings[a]))||'custom';
  // Return is always another way to reveal the answer unless it has been bound to something else.
  function keyAction(bindings,code){code=normalizeCode(code);return KEY_ACTIONS.find(a=>bindings[a]===code)||(code==='Enter'?'flip':null)}
- // Milestones give the overall bar a scale where a single word still shows; the last one is the whole list.
- const MILESTONES=[50,100,200,500,1000,2000,3000,5000];
- const milestone=(learned,total)=>MILESTONES.find(m=>m>learned&&m<total)||total;
- const api={key,day,parse,queue,grade,today,overall,tomorrow,milestone,MASTERED_DAYS,ALGORITHMS,KEY_ACTIONS,KEY_PRESETS,normalizeCode,bindable,keyLabel,keyBindings,bindKey,keyPreset,keyAction};if(typeof module!=='undefined')module.exports=api;else root.Vocab=api;
+ // Levels follow mastered words, the most credible evidence of vocabulary actually retained. The last level is the whole list.
+ const LEVELS=[[0,'起步'],[50,'入门'],[100,'基础'],[200,'进阶'],[500,'扎实'],[1000,'熟练'],[2000,'精熟'],[3000,'高阶'],[5000,'词汇达人']];
+ function levelTable(total){const t=LEVELS.filter(([min])=>min===0||min<total);return [...t,[Math.max(total,1),'词库通关']]}
+ // A level once reached is kept (peak), so forgetting a few words never takes it away; the count itself stays truthful.
+ function level(mastered,total,peak=1){const t=levelTable(total);let n=t.filter(([min])=>mastered>=min).length;n=Math.max(n,Math.min(peak,t.length));const [min,name]=t[n-1],next=t[n];return {n,name,min,next:next?{n:n+1,name:next[1],min:next[0]}:null}}
+ const api={key,day,parse,queue,grade,today,overall,tomorrow,level,MASTERED_DAYS,ALGORITHMS,KEY_ACTIONS,KEY_PRESETS,normalizeCode,bindable,keyLabel,keyBindings,bindKey,keyPreset,keyAction};if(typeof module!=='undefined')module.exports=api;else root.Vocab=api;
 })(globalThis);
