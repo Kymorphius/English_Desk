@@ -1,7 +1,7 @@
 {
   "name": "english-desk-clean",
   "productName": "English Desk Studio",
-  "version": "0.2.7",
+  "version": "0.2.8",
   "private": true,
   "description": "Independent IELTS writing and speaking practice",
   "author": "Vienky",
@@ -56,7 +56,7 @@
         }
       ],
       "extendInfo": {
-        "NSMicrophoneUsageDescription": "录制口语练习，只有点击转写时才发送到你配置的服务。"
+        "NSMicrophoneUsageDescription": "\u5f55\u5236\u53e3\u8bed\u7ec3\u4e60\uff0c\u53ea\u6709\u70b9\u51fb\u8f6c\u5199\u65f6\u624d\u53d1\u9001\u5230\u4f60\u914d\u7f6e\u7684\u670d\u52a1\u3002"
       }
     },
     "win": {
