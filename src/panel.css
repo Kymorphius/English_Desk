@@ -43,3 +43,4 @@ nav{width:100%}nav button{flex:1;padding:2px 5px;font-size:11px}.vocab-word{font
 #showAllModelsLabel{display:inline-flex;align-items:center;gap:6px;margin:0}#showAllModelsLabel[hidden]{display:none!important}#showAllModelsLabel input{width:auto;margin:0}.model-custom-row:not(:has(label:not([hidden]))){display:none}
 
 #autoAppUpdate{width:auto}nav button.has-update::after{content:"•";color:#007aff;margin-left:3px}
+nav [data-key]{position:relative}.show-tab-keys nav [data-key]::after{content:attr(data-key);position:absolute;top:0;right:3px;font-size:9px;line-height:1;color:var(--muted)}
