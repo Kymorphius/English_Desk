@@ -9,6 +9,8 @@
 @property(strong) NSWindow *owner;
 @property(strong) NSVisualEffectView *glass;
 @property(strong) id keyMonitor;
+@property(strong) id outsideMonitor;
+@property NSTimeInterval shownAt;
 @property BOOL pinned;
 @property napi_env env;
 @property napi_ref callback;
@@ -52,9 +54,10 @@
   if(self.popover.shown)[self.popover performClose:nil];else [self show];
 }
 - (void)open:(id)sender {[self show];}
-- (void)pin:(id)sender {self.pinned=!self.pinned;self.popover.behavior=self.pinned?NSPopoverBehaviorApplicationDefined:NSPopoverBehaviorTransient;[self notify:@"pin"];}
+- (void)pin:(id)sender {self.pinned=!self.pinned;self.popover.behavior=NSPopoverBehaviorApplicationDefined;[self notify:@"pin"];}
 - (void)quit:(id)sender {[self notify:@"quit"];}
 - (void)popoverDidShow:(NSNotification *)notification {
+  self.shownAt=NSProcessInfo.processInfo.systemUptime;
   // The popover lays out its content after the opening animation.
   [self.glass layoutSubtreeIfNeeded];
   if(!NSEqualRects(self.content.frame,self.glass.bounds))self.content.frame=self.glass.bounds;
@@ -81,17 +84,20 @@ static napi_value Create(napi_env env,napi_callback_info info){
   NSViewController *vc=[NSViewController new];vc.view=panel.glass;
   panel.popover=[NSPopover new];panel.popover.contentViewController=vc;panel.popover.delegate=panel;
   panel.popover.contentSize=NSMakeSize(400,720);panel.popover.animates=NO; // appear at once, like the system's menu bar extras, instead of dropping in
-  panel.popover.behavior=pinned?NSPopoverBehaviorApplicationDefined:NSPopoverBehaviorTransient;
+  panel.popover.behavior=NSPopoverBehaviorApplicationDefined;
   panel.item=[NSStatusBar.systemStatusBar statusItemWithLength:NSSquareStatusItemLength];
   panel.item.autosaveName=@"EnglishDeskStudioStatus";
   NSStatusBarButton *button=panel.item.button;button.image=[NSImage imageWithSystemSymbolName:@"character.book.closed" accessibilityDescription:@"English Desk Studio"];[button.image setTemplate:YES];
   button.toolTip=@"English Desk Studio";button.target=panel;button.action=@selector(clicked:);[button sendActionOn:NSEventMaskLeftMouseUp|NSEventMaskRightMouseUp];
+  // Closing is ours, not AppKit's: transient popovers also close on clicks that the status item then swallows as a drag, leaving the icon unresponsive.
+  panel.outsideMonitor=[NSEvent addGlobalMonitorForEventsMatchingMask:NSEventMaskLeftMouseDown|NSEventMaskRightMouseDown|NSEventMaskOtherMouseDown handler:^(NSEvent *event){if(!panel.pinned&&panel.popover.shown)[panel.popover performClose:nil];}];
+  [NSNotificationCenter.defaultCenter addObserverForName:NSApplicationDidResignActiveNotification object:nil queue:nil usingBlock:^(NSNotification *n){if(!panel.pinned&&panel.popover.shown&&NSProcessInfo.processInfo.systemUptime-panel.shownAt>0.3)[panel.popover performClose:nil];}];
   panel.keyMonitor=[NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskKeyDown handler:^NSEvent *(NSEvent *event){if(event.keyCode==53&&panel.popover.shown){[panel.popover performClose:nil];return nil;}return event;}];
   return undefined(env);
 }
 static napi_value Show(napi_env env,napi_callback_info info){[panel show];return undefined(env);}
 static napi_value Hide(napi_env env,napi_callback_info info){[panel.popover performClose:nil];return undefined(env);}
-static napi_value SetPinned(napi_env env,napi_callback_info info){size_t argc=1;napi_value arg;napi_get_cb_info(env,info,&argc,&arg,NULL,NULL);bool value=false;napi_get_value_bool(env,arg,&value);panel.pinned=value;panel.popover.behavior=value?NSPopoverBehaviorApplicationDefined:NSPopoverBehaviorTransient;return undefined(env);}
+static napi_value SetPinned(napi_env env,napi_callback_info info){size_t argc=1;napi_value arg;napi_get_cb_info(env,info,&argc,&arg,NULL,NULL);bool value=false;napi_get_value_bool(env,arg,&value);panel.pinned=value;panel.popover.behavior=NSPopoverBehaviorApplicationDefined;return undefined(env);}
 static napi_value Click(napi_env env,napi_callback_info info){[panel.item.button performClick:nil];return undefined(env);}
 static NSString *StringArgument(napi_env env,napi_callback_info info){size_t argc=1;napi_value arg;napi_get_cb_info(env,info,&argc,&arg,NULL,NULL);size_t length=0;napi_get_value_string_utf8(env,arg,NULL,0,&length);std::vector<char> bytes(length+1);napi_get_value_string_utf8(env,arg,bytes.data(),bytes.size(),&length);return [NSString stringWithUTF8String:bytes.data()];}
 static napi_value SelectFile(napi_env env,napi_callback_info info){
