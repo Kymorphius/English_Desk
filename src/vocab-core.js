@@ -77,9 +77,9 @@
  // What waits tomorrow: reviews falling due before tomorrow ends, plus tomorrow's new words.
  function tomorrow(words,progress,limit,now=Date.now()){const end=new Date(now);end.setHours(0,0,0,0);end.setDate(end.getDate()+2);let reviews=0,fresh=0;for(const w of words){const p=progress[key(w.word)];if(p){if(p.due<end.getTime())reviews++}else fresh++}return {reviews,fresh:Math.min(limit,fresh)}}
  // Keyboard bindings, stored as physical key codes so they work regardless of input method or keyboard layout.
- const KEY_ACTIONS=['flip','again','hard','good','easy','mastered','speak','undo'];
- const ADDED_ACTIONS=['undo']; // actions introduced after bindings could first be saved
- const KEY_PRESETS={digits:{flip:'Space',again:'Digit1',hard:'Digit2',good:'Digit3',easy:'Digit4',mastered:'Digit5',speak:'KeyR',undo:'KeyO'},home:{flip:'Space',again:'KeyA',hard:'KeyS',good:'KeyD',easy:'KeyF',mastered:'KeyJ',speak:'KeyR',undo:'KeyO'}};
+ const KEY_ACTIONS=['flip','again','hard','good','easy','mastered','speak','undo','ignore'];
+ const ADDED_ACTIONS=['undo','ignore']; // actions introduced after bindings could first be saved
+ const KEY_PRESETS={digits:{flip:'Space',again:'Digit1',hard:'Digit2',good:'Digit3',easy:'Digit4',mastered:'Digit5',speak:'KeyR',undo:'KeyO',ignore:'KeyX'},home:{flip:'Space',again:'KeyA',hard:'KeyS',good:'KeyD',easy:'KeyF',mastered:'KeyJ',speak:'KeyR',undo:'KeyO',ignore:'KeyX'}};
  const SYMBOLS={Space:'空格',Enter:'回车',Backspace:'⌫',ArrowLeft:'←',ArrowRight:'→',ArrowUp:'↑',ArrowDown:'↓',Semicolon:';',Quote:"'",Comma:',',Period:'.',Slash:'/',Backslash:'\\',BracketLeft:'[',BracketRight:']',Backquote:'`',Minus:'-',Equal:'='};
  const normalizeCode=code=>String(code||'').replace(/^Numpad(\d)$/,'Digit$1').replace(/^NumpadEnter$/,'Enter');
  const bindable=code=>/^(Key[A-Z]|Digit\d)$/.test(normalizeCode(code))||Object.hasOwn(SYMBOLS,normalizeCode(code));
