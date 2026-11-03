@@ -70,5 +70,10 @@
   const pending=queue(words,progress,limit,now).filter(w=>!relearning.has(key(w.word))).length+relearning.size;
   return {done:done.size,remaining:pending,total:done.size+pending};
  }
- const api={key,day,parse,queue,grade,today,ALGORITHMS};if(typeof module!=='undefined')module.exports=api;else root.Vocab=api;
+ // Overall progress. A word counts as mastered once its next review is at least 21 days away.
+ const MASTERED_DAYS=21;
+ function overall(words,progress){let learned=0,mastered=0;for(const w of words){const p=progress[key(w.word)];if(!p)continue;learned++;if(p.interval>=MASTERED_DAYS)mastered++}return {total:words.length,learned,mastered,learning:learned-mastered}}
+ // What waits tomorrow: reviews falling due before tomorrow ends, plus tomorrow's new words.
+ function tomorrow(words,progress,limit,now=Date.now()){const end=new Date(now);end.setHours(0,0,0,0);end.setDate(end.getDate()+2);let reviews=0,fresh=0;for(const w of words){const p=progress[key(w.word)];if(p){if(p.due<end.getTime())reviews++}else fresh++}return {reviews,fresh:Math.min(limit,fresh)}}
+ const api={key,day,parse,queue,grade,today,overall,tomorrow,MASTERED_DAYS,ALGORITHMS};if(typeof module!=='undefined')module.exports=api;else root.Vocab=api;
 })(globalThis);

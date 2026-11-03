@@ -1,7 +1,9 @@
 function vocabulary(){
  state.vocab??={custom:[],progress:{},limit:20};const v=state.vocab;v.algorithm=Vocab.ALGORITHMS.includes(v.algorithm)?v.algorithm:'classic';v.retention=[0.85,0.9,0.95].includes(v.retention)?v.retention:0.9;
  const words=[...new Map([...VOCABULARY,...v.custom].map(w=>[Vocab.key(w.word),w])).values()];
- header('背单词',`${words.length} 个单词 · 先回忆，再翻面评分`);
+ const renderOverall=()=>{const o=Vocab.overall(words,v.progress);header('背单词',`已学 ${o.learned} / ${o.total} · 已掌握 ${o.mastered}<span class="vocab-overall" aria-hidden="true"><span class="seg-mastered"></span><span class="seg-learning"></span></span>`);
+  for(const [cls,n] of [['.seg-mastered',o.mastered],['.seg-learning',o.learning]]){const seg=$(cls);seg.style.width=(o.total?n/o.total*100:0)+'%';if(n)seg.style.minWidth='2px'}
+  $('#top small').title=`已掌握：下次复习间隔 ${Vocab.MASTERED_DAYS} 天以上；学习中：已学但未掌握`};
  const names={classic:'固定倍数',fsrs:'FSRS',sm2:'SM-2'};
  $('#workspace').innerHTML=`<details id="vocabSettings" class="section vocab-settings" ${v.settingsOpen?'open':''}><summary>学习设置<span id="vocabSettingsSummary" class="muted"></span></summary><label>每天新词数量<input id="wordLimit" type="number" min="1" max="500" value="${v.limit}"></label><small>到期复习不占新词数量。再次打开会继续本机进度。</small><div class="field-row"><label>复习算法<select id="wordAlgorithm" aria-label="复习算法">${[['classic','固定倍数 · 默认'],['fsrs','FSRS'],['sm2','SM-2 · SuperMemo 经典']].map(([id,name])=>`<option value="${id}" ${id===v.algorithm?'selected':''}>${name}</option>`).join('')}</select></label><label id="wordRetentionLabel" ${v.algorithm==='fsrs'?'':'hidden'}>目标记住率<select id="wordRetention" aria-label="目标记住率">${[0.85,0.9,0.95].map(r=>`<option value="${r}" ${r===v.retention?'selected':''}>${Math.round(r*100)}%${r===0.9?' · 推荐':''}</option>`).join('')}</select></label></div><p id="wordAlgorithmNote" class="muted"></p><p class="muted">快捷键：空格或回车显示答案，1–5 依次评分，R 朗读。</p></details><section id="wordCard" class="section vocab-card"></section><div class="word-import-entry"><button id="openWordImport" class="quiet">导入单词库</button></div>`;
  $('#vocabSettings').ontoggle=e=>{v.settingsOpen=e.target.open;save()};
@@ -14,13 +16,19 @@ function vocabulary(){
  function showWord(){
   const options={algorithm:v.algorithm,retention:v.retention},q=Vocab.queue(words,v.progress,v.limit),w=q[0];const box=$('#wordCard');
   const t=Vocab.today(words,v.progress,v.limit),bar=label=>t.total?`<div class="vocab-progress"><div class="vocab-progress-row"><span>${label}</span><span>今日 ${t.done} / ${t.total}</span></div><progress value="${t.done}" max="${t.total}" aria-label="今日进度 ${t.done} / ${t.total}"></progress></div>`:'';
-  if(!w){box.innerHTML=bar(t.remaining?`还有 ${t.remaining} 个稍后重来`:'今日已完成')+'<p>当前没有待学单词。已完成今日新词或复习，稍后再来看。</p><button id="refreshWords">刷新复习</button>';$('#refreshWords').onclick=showWord;return}
+  renderOverall();clearTimeout(wordTimer);
+  if(!w){
+   const now=Date.now(),waiting=Object.values(v.progress).filter(p=>p.interval<1&&p.due>now);let message;
+   if(waiting.length){const next=Math.min(...waiting.map(p=>p.due));message=`下一个单词约 ${Math.max(1,Math.ceil((next-now)/1000))} 秒后自动出现。`;wordTimer=setTimeout(()=>{if(page==='vocabulary'&&box.isConnected)showWord()},next-now+300)}
+   else{const m=Vocab.tomorrow(words,v.progress,v.limit),parts=[m.reviews&&`${m.reviews} 个复习`,m.fresh&&`${m.fresh} 个新词`].filter(Boolean);message=parts.length?`明天有 ${parts.join('和 ')}。`:'明天没有安排复习。'}
+   box.innerHTML=bar(t.remaining?`还有 ${t.remaining} 个稍后重来`:'今日已完成')+`<p class="vocab-empty">${message}</p>`;return}
   const prior=v.progress[Vocab.key(w.word)],grades=[['again','重来'],['hard','困难'],['good','记得'],['easy','简单'],['mastered','精通']];
   box.innerHTML=`${bar(prior?'复习':'新词')}<div class="vocab-face"><div class="vocab-head"><h2 class="vocab-word">${esc(w.word)}</h2><button id="speakWord" class="quiet vocab-speak"></button></div><p class="vocab-phonetic">${esc((state.speechAccent==='en-US'?w.us:w.uk)||'')}</p></div><button id="flipWord" class="primary vocab-flip">显示答案 <kbd>空格</kbd></button><div id="wordBack" hidden><p class="vocab-meaning">${esc(w.meaning)}</p>${w.example?`<p class="vocab-example">${esc(w.example)}</p>`:''}${w.translation?`<p class="muted">${esc(w.translation)}</p>`:''}<div class="vocab-grades">${grades.map(([r,t],i)=>`<div class="grade"><small>${r==='mastered'?'1 个月':intervalText(Vocab.grade(prior,r,Date.now(),options).interval)}</small><button data-grade="${r}" class="grade-${r}" title="${t}（按 ${i+1}）"><span class="grade-key">${i+1}</span>${t}</button></div>`).join('')}</div></div>`;
   setAudioIcon($('#speakWord'),'speaker','朗读单词（R）');$('#speakWord').onclick=()=>speak(w.word);$('#flipWord').onclick=()=>{$('#wordBack').hidden=false;$('#flipWord').hidden=true};
   box.querySelectorAll('[data-grade]').forEach(b=>b.onclick=()=>{v.progress[Vocab.key(w.word)]=Vocab.grade(v.progress[Vocab.key(w.word)],b.dataset.grade,Date.now(),options);save();showWord()});
  }showWord();
 }
+let wordTimer;
 // Keyboard review: Space/Enter flips the card, 1–5 grade it, R reads the word aloud.
 // Chromium treats any focused element as keyboard-focused once a key is pressed, so track how focus arrived.
 let tabFocus=false;document.addEventListener('pointerdown',()=>{tabFocus=false},true);
