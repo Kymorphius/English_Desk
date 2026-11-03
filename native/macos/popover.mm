@@ -11,6 +11,7 @@
 @property(strong) id keyMonitor;
 @property(strong) id outsideMonitor;
 @property NSTimeInterval shownAt;
+@property NSInteger placementWaits;
 @property BOOL pinned;
 @property napi_env env;
 @property napi_ref callback;
@@ -26,6 +27,9 @@
 }
 - (void)show {
   NSStatusBarButton *b=self.item.button;
+  // Right after launch the status item has not been placed yet (it sits far off-screen) and the panel would open in a screen corner; wait up to 1s for it.
+  if(NSMinX(b.window.frame)<-1000&&self.placementWaits<10){self.placementWaits++;dispatch_after(dispatch_time(DISPATCH_TIME_NOW,(int64_t)(0.1*NSEC_PER_SEC)),dispatch_get_main_queue(),^{[self show];});return;}
+  self.placementWaits=0;
   NSScreen *screen=b.window.screen?:NSScreen.mainScreen; // the status item can be hidden behind the notch, leaving no screen
   NSSize size=NSMakeSize(400,MIN(720,screen.visibleFrame.size.height-30));
   self.popover.contentSize=size;
