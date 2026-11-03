@@ -1,6 +1,6 @@
 function vocabulary(){
  state.vocab??={custom:[],progress:{},limit:20};const v=state.vocab;v.algorithm=Vocab.ALGORITHMS.includes(v.algorithm)?v.algorithm:'classic';v.retention=[0.85,0.9,0.95].includes(v.retention)?v.retention:0.9;if(!v.keysV2){if(v.keys&&Vocab.keyPreset(Vocab.keyBindings(v.keys))==='digits')v.keys={...Vocab.KEY_PRESETS.home};v.keysV2=true} // the default moved from digits to the home row
- v.keys=Vocab.keyBindings(v.keys);
+ v.keys=Vocab.keyBindings(v.keys);v.plain??=true; // plain mode is the default; an explicit choice is kept
  lastOverall=null;lastToday=null;lastRing=null;linkReturn=null;
  v.ignored??={};const allWords=[...new Map([...VOCABULARY,...v.custom].map(w=>[Vocab.key(w.word),w])).values()];
  // Ignored words leave the list entirely: no reviews, and they don't count towards totals or levels.
