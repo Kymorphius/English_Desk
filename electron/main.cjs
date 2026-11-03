@@ -30,11 +30,12 @@ function handle(name,fn){ipcMain.handle(name,(e,...args)=>{if(!trusted(e))throw 
 const apiKeyPath=path.join(app.getPath('userData'),'api-keys.json');
 async function readApiKeys(){try{return JSON.parse(await fs.readFile(apiKeyPath,'utf8'))}catch{return{}}}
 function keySlot(provider){if(typeof provider!=='string'||!provider||provider.length>300)throw Error('无效的服务商');return provider}
-async function savedApiKey(slot){const stored=(await readApiKeys())[keySlot(slot)];if(!stored)return '';if(!safeStorage.isEncryptionAvailable())throw Error('系统加密不可用，无法读取已保存的密钥');try{return safeStorage.decryptString(Buffer.from(stored,'base64'))}catch{throw Error('无法读取已保存的密钥，请在设置中重新填写')}}
+async function writeApiKeys(keys){await fs.mkdir(app.getPath('userData'),{recursive:true});await fs.writeFile(apiKeyPath,JSON.stringify(keys),{mode:0o600})}
+async function savedApiKey(slot){const keys=await readApiKeys(),stored=keys[keySlot(slot)];if(!stored)return '';if(!await safeStorage.isAsyncEncryptionAvailable())throw Error('系统加密不可用，无法读取已保存的密钥');let decrypted;try{decrypted=await safeStorage.decryptStringAsync(Buffer.from(stored,'base64'))}catch{throw Error('无法读取已保存的密钥，请在设置中重新填写')}
+ if(decrypted.shouldReEncrypt){keys[slot]=(await safeStorage.encryptStringAsync(decrypted.result)).toString('base64');await writeApiKeys(keys).catch(console.error)}return decrypted.result}
 handle('has-api-key',async slot=>Boolean((await readApiKeys())[keySlot(slot)]));
-handle('set-api-key',async(slot,key)=>{key=String(key||'').trim();if(!key)return false;if(key.length>2000)throw Error('密钥过长');if(!safeStorage.isEncryptionAvailable())throw Error('系统加密不可用，密钥未保存');const keys=await readApiKeys();keys[keySlot(slot)]=safeStorage.encryptString(key).toString('base64');
- await fs.mkdir(app.getPath('userData'),{recursive:true});await fs.writeFile(apiKeyPath,JSON.stringify(keys),{mode:0o600});return true});
-handle('delete-api-key',async slot=>{const keys=await readApiKeys();delete keys[keySlot(slot)];await fs.mkdir(app.getPath('userData'),{recursive:true});await fs.writeFile(apiKeyPath,JSON.stringify(keys),{mode:0o600});return true});
+handle('set-api-key',async(slot,key)=>{key=String(key||'').trim();if(!key)return false;if(key.length>2000)throw Error('密钥过长');if(!await safeStorage.isAsyncEncryptionAvailable())throw Error('系统加密不可用，密钥未保存');const encrypted=(await safeStorage.encryptStringAsync(key)).toString('base64'),keys=await readApiKeys();keys[keySlot(slot)]=encrypted;await writeApiKeys(keys);return true});
+handle('delete-api-key',async slot=>{const keys=await readApiKeys();delete keys[keySlot(slot)];await writeApiKeys(keys);return true});
 const reminders=require('./word-reminder.cjs').createReminder(path.join(app.getPath('userData'),'word-reminder.json'),()=>{
  if(!Notification.isSupported())return false;
  const notification=new Notification({title:'English Desk · 背词提醒',body:'今天的单词可以开始复习了。点击打开背词面板。'});
