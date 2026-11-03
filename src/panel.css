@@ -70,7 +70,7 @@ kbd{font:11px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-varian
 .vocab-card:has(#wordBack[hidden]) .vocab-face{flex:1;display:flex;flex-direction:column;justify-content:center;padding-bottom:12px}
 #wordCard.vocab-card{min-height:280px} /* about the height of the answer side, so flipping keeps the card size and the word has room to travel */
 .title-count{margin-left:8px;font-size:12px;font-weight:400;color:var(--muted);font-variant-numeric:tabular-nums}
-.vocab-plain-toggle{color:var(--muted)}.vocab-plain-toggle.active{color:var(--ink);background:var(--soft)}
+.vocab-plain-toggle{color:var(--muted)}.vocab-plain-toggle:hover{color:var(--ink)}
 .vocab-plain .vocab-overall,.vocab-plain .hp-row-known{display:none}.vocab-plain .vocab-level,.vocab-plain .vocab-level-button:hover .vocab-level{font-weight:400;color:var(--muted)}.vocab-plain .vocab-level-block{margin-bottom:8px}
 .vocab-plain .hp-head{margin-bottom:3px}.vocab-plain .hp-bar{height:2px;padding:0;border-radius:1px;box-shadow:none}.vocab-plain .hp-bar span{border-radius:1px;background:var(--muted)}
 .vocab-plain .vocab-card{--again:var(--ink);--hard:var(--ink);--good:var(--ink);--easy:var(--ink);--mastered:var(--ink)}.vocab-plain .vocab-flip{color:var(--ink);background:var(--soft);border-color:var(--line)}.vocab-plain .vocab-flip kbd{border-color:var(--line)}.vocab-plain .link-word,.vocab-plain .vocab-tag.undone{color:var(--ink);background:none}
