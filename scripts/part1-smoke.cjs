@@ -1,0 +1,18 @@
+const {_electron,expect}=require('@playwright/test');const assert=require('node:assert/strict');const http=require('node:http');
+(async()=>{
+const server=http.createServer((req,res)=>{req.resume();req.on('end',()=>{res.setHeader('Content-Type','application/json');res.end(JSON.stringify({text:'Only this question gets the transcript.'}))})});await new Promise(r=>server.listen(0,'127.0.0.1',r));
+const a=await _electron.launch({...(process.env.ED_ELECTRON_PATH?{executablePath:process.env.ED_ELECTRON_PATH}:{}),args:['.','--use-fake-ui-for-media-stream','--use-fake-device-for-media-stream'],env:{...process.env,ENGLISH_DESK_TEST:'1'}});
+try{
+const p=await a.firstWindow();await a.evaluate(({app})=>{app.testDialogs={confirm:()=>true}});await p.locator('#workspace').waitFor();await p.evaluate(()=>localStorage.clear());await p.reload();await p.locator('[data-page="settings"]').click();await p.locator('#base').fill('http://127.0.0.1:'+server.address().port+'/v1');await p.locator('#saveSettings').click();await p.locator('[data-page="speaking"]').click();
+const cards=p.locator('[data-question-id]'),one=cards.nth(0),two=cards.nth(1);assert.equal(await cards.count(),8);assert.equal(await p.locator('#draft').count(),0);
+await expect(one.locator('.question-practice')).not.toHaveAttribute('open','');await expect(one.locator('.question-reference')).not.toHaveAttribute('open','');
+await one.locator('.question-practice>summary').click();await two.locator('.question-practice>summary').click();await one.locator('textarea').fill('First answer');await two.locator('textarea').fill('Second answer');
+await one.locator('[data-action="record"]').click();await expect(one.locator('[data-action="record"]')).toHaveAttribute('aria-label','停止录音');await p.waitForTimeout(700);await one.locator('[data-action="record"]').click();await expect(one.locator('audio')).toBeVisible();await expect(two.locator('audio')).toBeHidden();const firstAudio=await one.locator('audio').getAttribute('src');
+await two.locator('[data-action="record"]').click();await expect(two.locator('[data-action="record"]')).toHaveAttribute('aria-label','停止录音');await p.waitForTimeout(700);await two.locator('[data-action="record"]').click();await expect(two.locator('audio')).toBeVisible();assert.equal(await one.locator('audio').getAttribute('src'),firstAudio);assert.notEqual(await two.locator('audio').getAttribute('src'),firstAudio);
+await one.locator('[data-action="transcribe"]').click();await expect(one.locator('textarea')).toHaveValue('First answer\nOnly this question gets the transcript.');await expect(two.locator('textarea')).toHaveValue('Second answer');
+await two.locator('[data-action="copy"]').click();const copied=await a.evaluate(({clipboard})=>clipboard.readText());assert.match(copied,/Second answer/);assert.ok(!copied.includes('First answer'));
+await p.locator('[data-page="writing"]').click();await p.locator('[data-page="speaking"]').click();await one.locator('.question-practice>summary').click();await two.locator('.question-practice>summary').click();assert.equal(await one.locator('audio').getAttribute('src'),firstAudio);await expect(two.locator('textarea')).toHaveValue('Second answer');
+await p.reload();await p.locator('[data-page="speaking"]').click();await two.locator('.question-practice>summary').click();await expect(two.locator('textarea')).toHaveValue('Second answer');await expect(two.locator('audio')).toBeHidden();
+console.log('PASS: all topic questions, independent collapsed practice/reference, separate drafts and audio, no transcript leakage, per-question AI copy, draft persistence and temporary audio lifecycle');
+}finally{await a.close();server.close()}
+})().catch(e=>{console.error(e);process.exit(1)});
