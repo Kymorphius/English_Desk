@@ -63,5 +63,12 @@
   if(rating==='mastered'){record.due=nextMonth(now);record.interval=(record.due-now)/DAY}else record.due=now+Math.round(record.interval*DAY);
   return record;
  }
- const api={key,day,parse,queue,grade,ALGORITHMS};if(typeof module!=='undefined')module.exports=api;else root.Vocab=api;
+ // Today's progress. Words being relearned after "again" count as remaining until they pass, so the total stays steady.
+ function today(words,progress,limit,now=Date.now()){
+  const d=day(now),relearning=new Set(),done=new Set();
+  for(const [k,p] of Object.entries(progress))if(p.last&&day(p.last)===d)(p.interval<1?relearning:done).add(k);
+  const pending=queue(words,progress,limit,now).filter(w=>!relearning.has(key(w.word))).length+relearning.size;
+  return {done:done.size,remaining:pending,total:done.size+pending};
+ }
+ const api={key,day,parse,queue,grade,today,ALGORITHMS};if(typeof module!=='undefined')module.exports=api;else root.Vocab=api;
 })(globalThis);
