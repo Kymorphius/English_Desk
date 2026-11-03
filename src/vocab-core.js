@@ -20,7 +20,8 @@
  }
  function queue(words,progress,limit,now=Date.now()){
   const due=words.filter(w=>progress[key(w.word)]&&progress[key(w.word)].due<=now).sort((a,b)=>progress[key(a.word)].due-progress[key(b.word)].due);
-  const introduced=Object.values(progress).filter(p=>p.introduced===day(now)).length;
+  // Words marked mastered the first time they appear are already known, so they don't use up the daily quota.
+  const introduced=Object.values(progress).filter(p=>p.introduced===day(now)&&!p.known).length;
   return [...due,...words.filter(w=>!progress[key(w.word)]).slice(0,Math.max(0,limit-introduced))];
  }
  const DAY=86400000,RATINGS=['again','hard','good','easy','mastered'],GRADE={again:1,hard:2,good:3,easy:4,mastered:4};
@@ -59,16 +60,16 @@
   if(!RATINGS.includes(rating))throw Error('未知评分');
   const algorithm=ALGORITHMS.includes(options.algorithm)?options.algorithm:'classic',retention=Math.min(0.97,Math.max(0.7,Number(options.retention)||0.9));
   const next=algorithm==='sm2'?sm2(previous,rating):algorithm==='fsrs'?fsrs(previous,rating,now,retention):classic(previous,rating);
-  const record={...(previous||{}),...next,introduced:previous?.introduced||day(now),last:now,reviews:(previous?.reviews||0)+1,lapses:(previous?.lapses||0)+(rating==='again'&&previous?1:0)};
+  const record={...(previous||{}),...next,...(!previous&&rating==='mastered'?{known:true}:{}),introduced:previous?.introduced||day(now),last:now,reviews:(previous?.reviews||0)+1,lapses:(previous?.lapses||0)+(rating==='again'&&previous?1:0)};
   if(rating==='mastered'){record.due=nextMonth(now);record.interval=(record.due-now)/DAY}else record.due=now+Math.round(record.interval*DAY);
   return record;
  }
  // Today's progress. Words being relearned after "again" count as remaining until they pass, so the total stays steady.
  function today(words,progress,limit,now=Date.now()){
   const d=day(now),relearning=new Set(),done=new Set();
-  for(const [k,p] of Object.entries(progress))if(p.last&&day(p.last)===d)(p.interval<1?relearning:done).add(k);
+  let known=0;for(const [k,p] of Object.entries(progress)){if(!p.last||day(p.last)!==d)continue;if(p.known&&p.introduced===d)known++;else (p.interval<1?relearning:done).add(k)}
   const pending=queue(words,progress,limit,now).filter(w=>!relearning.has(key(w.word))).length+relearning.size;
-  return {done:done.size,remaining:pending,total:done.size+pending};
+  return {done:done.size,remaining:pending,total:done.size+pending,known};
  }
  // Overall progress. A word counts as mastered once its next review is at least 21 days away.
  const MASTERED_DAYS=21;
