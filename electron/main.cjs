@@ -72,10 +72,12 @@ const bossKeyPath=path.join(app.getPath('userData'),'boss-key.json');
 let bossKey='Alt+`',bossKeyActive=false;
 function bossToggle(){if(quitting||!win)return;const shown=nativePanel?JSON.parse(nativePanel.inspect()).shown:win.isVisible();if(!shown)return showPanel();win.webContents.send('boss-key');if(nativePanel)nativePanel.hide();else win.hide()}
 function registerBossKey(key){if(bossKeyActive)globalShortcut.unregister(bossKey);bossKeyActive=false;if(!key)return true;try{bossKeyActive=globalShortcut.register(key,bossToggle)}catch{bossKeyActive=false}return bossKeyActive}
-const validBossKey=key=>key===''||(key.length<=40&&/^((Command|Control|Alt|Shift)\+)+[^+]+$/.test(key)&&/(Command|Control|Alt)\+/.test(key));
+// ⌘ (Ctrl on Windows) plus one key is how apps and the system spell copy, paste, tab switching…; a global boss key must not take those.
+const primaryOnly=key=>{const mods=key.split('+').slice(0,-1).filter(m=>m!=='Shift');return mods.length===1&&mods[0]===(process.platform==='darwin'?'Command':'Control')};
+const validBossKey=key=>key===''||(key.length<=40&&/^((Command|Control|Alt|Shift)\+)+[^+]+$/.test(key)&&/(Command|Control|Alt)\+/.test(key)&&!primaryOnly(key));
 handle('get-boss-key',()=>({key:bossKey,active:bossKeyActive}));
 handle('pause-boss-key',paused=>{if(paused){if(bossKeyActive)globalShortcut.unregister(bossKey);bossKeyActive=false}else registerBossKey(bossKey);return {key:bossKey,active:bossKeyActive}});
-handle('set-boss-key',async key=>{key=key==null?'':String(key);if(!validBossKey(key))throw Error('老板键需要包含 ⌘、⌃ 或 ⌥ 中的至少一个');const prev=bossKey;
+handle('set-boss-key',async key=>{key=key==null?'':String(key);if(!validBossKey(key))throw Error(primaryOnly(key)?'这个组合是常用的系统或应用快捷键，请再加上 ⌥ 或 ⌃':'老板键需要包含 ⌘、⌃ 或 ⌥ 中的至少一个');const prev=bossKey;
  if(!registerBossKey(key)){bossKey=prev;registerBossKey(prev);throw Error('这个组合已被其他应用占用，请换一个')}
  bossKey=key;await fs.mkdir(app.getPath('userData'),{recursive:true});await fs.writeFile(bossKeyPath,JSON.stringify({key}));return {key,active:bossKeyActive}});
 app.on('will-quit',()=>globalShortcut.unregisterAll());
