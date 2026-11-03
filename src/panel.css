@@ -69,3 +69,4 @@ kbd{font:11px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-varian
 .vocab-speak,.vocab-ignore{box-shadow:none}.vocab-speak:hover,.vocab-ignore:hover{background:var(--soft)}
 .vocab-card:has(#wordBack[hidden]) .vocab-face{flex:1;display:flex;flex-direction:column;justify-content:center;padding-bottom:12px}
 #wordCard.vocab-card{min-height:280px} /* about the height of the answer side, so flipping keeps the card size and the word has room to travel */
+.title-count{margin-left:8px;font-size:12px;font-weight:400;color:var(--muted);font-variant-numeric:tabular-nums}
