@@ -67,7 +67,7 @@ kbd{font:11px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-varian
 .vocab-undo.audio-icon{width:auto;gap:3px;padding:4px 6px!important}.vocab-undo kbd{font-size:10px;padding:0 3px;color:var(--muted)}
 .vocab-phonetic{display:flex;align-items:center;gap:8px}.vocab-phonetic .vocab-tag{flex:none;max-width:60%;margin:0 0 0 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.vocab-ignore{border:0;background:none;color:var(--muted)}.vocab-ignore.audio-icon{width:auto;gap:3px;padding:4px 6px!important}.vocab-ignore kbd{font-size:10px;padding:0 3px}.vocab-ignore:hover{color:var(--ink)}.variant-kind{color:var(--ink)}
 .vocab-speak,.vocab-ignore{box-shadow:none}.vocab-speak:hover,.vocab-ignore:hover{background:var(--soft)}
-.vocab-card:has(#wordBack[hidden]) .vocab-face{flex:1;display:flex;flex-direction:column;justify-content:center;padding-bottom:12px}
+.vocab-card:not(.still):has(#wordBack[hidden]) .vocab-face{flex:1;display:flex;flex-direction:column;justify-content:center;padding-bottom:12px} /* 静止 keeps the word where the answer side has it */
 #wordCard.vocab-card{min-height:280px} /* about the height of the answer side, so flipping keeps the card size and the word has room to travel */
 .title-count{margin-left:8px;font-size:12px;font-weight:400;color:var(--muted);font-variant-numeric:tabular-nums}
 .vocab-plain-toggle{color:var(--muted)}.vocab-plain-toggle:hover{color:var(--ink)}
