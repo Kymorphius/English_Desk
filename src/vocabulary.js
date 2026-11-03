@@ -1,19 +1,32 @@
 function vocabulary(){
- state.vocab??={custom:[],progress:{},limit:20};const v=state.vocab;
+ state.vocab??={custom:[],progress:{},limit:20};const v=state.vocab;v.algorithm=Vocab.ALGORITHMS.includes(v.algorithm)?v.algorithm:'classic';v.retention=[0.85,0.9,0.95].includes(v.retention)?v.retention:0.9;
  const words=[...new Map([...VOCABULARY,...v.custom].map(w=>[Vocab.key(w.word),w])).values()];
  header('背单词',`${words.length} 个单词 · 先回忆，再翻面评分`);
- $('#workspace').innerHTML=`<section class="section"><label>每天新词数量<input id="wordLimit" type="number" min="1" max="500" value="${v.limit}"></label><small>到期复习不占新词数量。再次打开会继续本机进度。</small><div id="wordCard"></div></section><div class="word-import-entry"><button id="openWordImport" class="quiet">导入单词库</button></div>`;
+ $('#workspace').innerHTML=`<section class="section"><label>每天新词数量<input id="wordLimit" type="number" min="1" max="500" value="${v.limit}"></label><small>到期复习不占新词数量。再次打开会继续本机进度。</small><div class="field-row"><label>复习算法<select id="wordAlgorithm" aria-label="复习算法">${[['classic','固定倍数 · 默认'],['fsrs','FSRS'],['sm2','SM-2 · SuperMemo 经典']].map(([id,name])=>`<option value="${id}" ${id===v.algorithm?'selected':''}>${name}</option>`).join('')}</select></label><label id="wordRetentionLabel" ${v.algorithm==='fsrs'?'':'hidden'}>目标记住率<select id="wordRetention" aria-label="目标记住率">${[0.85,0.9,0.95].map(r=>`<option value="${r}" ${r===v.retention?'selected':''}>${Math.round(r*100)}%${r===0.9?' · 推荐':''}</option>`).join('')}</select></label></div><p id="wordAlgorithmNote" class="muted"></p><div id="wordCard"></div></section><div class="word-import-entry"><button id="openWordImport" class="quiet">导入单词库</button></div>`;
+ const notes={fsrs:'按记忆模型估算每个词的遗忘速度，在记住概率降到目标值时安排复习。记住率越高，复习越频繁。',sm2:'SuperMemo 经典算法：每个词有自己的容易度，困难会降低、简单会提高；忘记后从 1 天重新开始。',classic:'默认算法：困难 ×1.2、记得 ×2.5、简单 ×3.5，所有单词使用相同倍数。'};
+ const syncAlgorithm=()=>{$('#wordRetentionLabel').hidden=v.algorithm!=='fsrs';$('#wordAlgorithmNote').textContent=notes[v.algorithm]+' 切换算法会保留现有进度。'};syncAlgorithm();
+ $('#wordAlgorithm').onchange=e=>{v.algorithm=e.target.value;save();syncAlgorithm();showWord()};
+ $('#wordRetention').onchange=e=>{v.retention=Number(e.target.value);save();showWord()};
  $('#wordLimit').onchange=e=>{const n=Number(e.target.value);if(!Number.isInteger(n)||n<1||n>500){e.target.value=v.limit;return toast('每天新词数量为 1–500')}v.limit=n;save();showWord()};
  $('#openWordImport').onclick=()=>{changePage('settings');$('#wordImportSettings').scrollIntoView({block:'start'});$('#wordImportText').focus({preventScroll:true})};
  function showWord(){
-  const q=Vocab.queue(words,v.progress,v.limit),w=q[0];const box=$('#wordCard');
+  const options={algorithm:v.algorithm,retention:v.retention},q=Vocab.queue(words,v.progress,v.limit),w=q[0];const box=$('#wordCard');
   if(!w){box.innerHTML='<p>当前没有待学单词。已完成今日新词或复习，稍后再来看。</p><button id="refreshWords">刷新复习</button>';$('#refreshWords').onclick=showWord;return}
-  box.innerHTML=`<p class="muted">本轮待学 ${q.length} · ${v.progress[Vocab.key(w.word)]?'复习':'新词'}</p><h2 class="vocab-word">${esc(w.word)}</h2><p>${esc((state.speechAccent==='en-US'?w.us:w.uk)||'')}</p><button id="speakWord" title="朗读单词" aria-label="朗读单词">🔊</button><button id="flipWord" class="primary">显示答案</button><div id="wordBack" hidden><p>${esc(w.meaning)}</p><p>${esc(w.example||'')}</p><p class="muted">${esc(w.translation||'')}</p><div class="tools">${[['again','重来'],['hard','困难'],['good','记得'],['easy','简单'],['mastered','精通']].map(([r,t])=>`<button data-grade="${r}">${t}<small> ${r==='mastered'?'1 个月':intervalText(Vocab.grade(v.progress[Vocab.key(w.word)],r).interval)}</small></button>`).join('')}</div></div>`;
+  box.innerHTML=`<p class="muted">本轮待学 ${q.length} · ${v.progress[Vocab.key(w.word)]?'复习':'新词'}</p><h2 class="vocab-word">${esc(w.word)}</h2><p>${esc((state.speechAccent==='en-US'?w.us:w.uk)||'')}</p><button id="speakWord" title="朗读单词" aria-label="朗读单词">🔊</button><button id="flipWord" class="primary">显示答案 <kbd>空格</kbd></button><div id="wordBack" hidden><p>${esc(w.meaning)}</p><p>${esc(w.example||'')}</p><p class="muted">${esc(w.translation||'')}</p><div class="tools">${[['again','重来'],['hard','困难'],['good','记得'],['easy','简单'],['mastered','精通']].map(([r,t],i)=>`<button data-grade="${r}"><kbd>${i+1}</kbd> ${t}<small> ${r==='mastered'?'1 个月':intervalText(Vocab.grade(v.progress[Vocab.key(w.word)],r,Date.now(),options).interval)}</small></button>`).join('')}</div><p class="muted">快捷键：空格或回车显示答案，1–5 评分，R 朗读。</p></div>`;
   $('#speakWord').onclick=()=>speak(w.word);$('#flipWord').onclick=()=>{$('#wordBack').hidden=false;$('#flipWord').hidden=true};
-  box.querySelectorAll('[data-grade]').forEach(b=>b.onclick=()=>{v.progress[Vocab.key(w.word)]=Vocab.grade(v.progress[Vocab.key(w.word)],b.dataset.grade);save();showWord()});
+  box.querySelectorAll('[data-grade]').forEach(b=>b.onclick=()=>{v.progress[Vocab.key(w.word)]=Vocab.grade(v.progress[Vocab.key(w.word)],b.dataset.grade,Date.now(),options);save();showWord()});
  }showWord();
 }
-function intervalText(days){return days<1?'1 分钟':Math.round(days)+' 天'}
+// Keyboard review: Space/Enter flips the card, 1–5 grade it, R reads the word aloud.
+document.addEventListener('keydown',e=>{
+ if(page!=='vocabulary'||e.metaKey||e.ctrlKey||e.altKey||e.repeat||document.querySelector('.select-menu'))return;
+ const t=e.target;if(t.closest?.('input,textarea,select,[contenteditable="true"]'))return;
+ const back=$('#wordBack');if(!back)return;
+ if((e.key===' '||e.key==='Enter')&&back.hidden){if(t.tagName==='BUTTON'&&t.id!=='flipWord'&&e.key==='Enter')return;e.preventDefault();$('#flipWord').click()}
+ else if(/^[1-5]$/.test(e.key)&&!back.hidden){e.preventDefault();back.querySelectorAll('[data-grade]')[Number(e.key)-1]?.click()}
+ else if(e.key==='r'||e.key==='R'){e.preventDefault();$('#speakWord')?.click()}
+});
+function intervalText(days){return days<1?'1 分钟':days<30?Math.round(days)+' 天':days<365?Math.round(days/30)+' 个月':(Math.round(days/36.5)/10)+' 年'}
 async function reminderSettings(){
  const section=document.createElement('section');section.className='section';section.innerHTML='<h2>背词提醒</h2><label><input type="checkbox" id="wordReminderEnabled"> 开启每日提醒</label><label>提醒时间<input id="wordReminderTime" type="time" value="20:00"></label><button id="saveWordReminder">保存提醒</button><p class="muted">默认关闭。开启后需允许系统通知，并让应用保持运行；关闭面板仍可提醒，退出应用后不提醒。</p><p id="wordReminderStatus" role="status"></p>';$('#workspace').append(section);
  const license=document.createElement('details');license.className='section';license.innerHTML='<summary>开源许可</summary><p>Word Atlas contributors — CC BY 4.0。词条已精简字段。来源：github.com/designfuchen/word-atlas；授权：creativecommons.org/licenses/by/4.0/。</p>';$('#workspace').append(license);
