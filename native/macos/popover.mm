@@ -28,7 +28,7 @@
   NSSize size=NSMakeSize(400,MIN(720,screen.visibleFrame.size.height-30));
   self.popover.contentSize=size;
   // Give the web content its final size before the popover appears; resizing it afterwards made the page reflow and visibly drop.
-  self.glass.frame=NSMakeRect(0,0,size.width,size.height);self.content.frame=self.glass.bounds;
+  [self.glass setFrameSize:size];self.content.frame=self.glass.bounds; // size only: the popover owns where its content view sits
   [NSApp activateIgnoringOtherApps:YES];
   [self.popover showRelativeToRect:b.bounds ofView:b preferredEdge:NSMinYEdge];
   // macOS 26 first places the popover a few points into the menu bar and moves it down about 0.1s later; put it at the final place now so nothing moves.
