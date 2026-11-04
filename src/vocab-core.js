@@ -134,6 +134,19 @@
  function lookupWord(token,has){const t=String(token).toLowerCase().replace(/[’']s$/,'').replace(/’/g,"'"),c=[t,IRREGULAR[t]];if(t.endsWith('ies'))c.push(t.slice(0,-3)+'y');if(t.endsWith('es'))c.push(t.slice(0,-2));if(t.endsWith('s'))c.push(t.slice(0,-1));
   for(const suffix of ['ed','ing'])if(t.endsWith(suffix)){const b=t.slice(0,-suffix.length);c.push(b,b+'e');if(/(.)\1$/.test(b))c.push(b.slice(0,-1));if(b.endsWith('i'))c.push(b.slice(0,-1)+'y')}
   return c.find(x=>x&&has(x))||null}
+ // The learner's own imported texts, split into sentences once with a word index, so original sentences for a collocation are quick to find.
+ function sentenceIndex(materials){const sentences=[],postings=new Map(),seen=new Set();
+  const add=(paragraph,title)=>{for(const part of paragraph.split(/(?<=[.!?])\s+(?=["“‘(]?[A-Z0-9])/)){const text=part.trim(),n=(text.match(/[A-Za-z]+/g)||[]).length;if(n<5||n>60||seen.has(text))continue;seen.add(text);
+   const id=sentences.push({text,title})-1;for(const t of new Set(tokens(text)))(postings.get(t)||postings.set(t,[]).get(t)).push(id)}};
+  // Blank lines end a paragraph. A short line without closing punctuation, followed by a blank line or a capital, is a heading and is
+  // dropped; any other line break is wrapping (text copied from a PDF), so the lines are joined.
+  for(const m of materials||[]){const title=String(m?.title||'语料'),lines=String(m?.text||'').split(/\r?\n/).map(l=>l.trim());let paragraph='';
+   lines.forEach((line,i)=>{const next=lines[i+1]||'',heading=line&&(line.match(/[A-Za-z]+/g)||[]).length<=8&&!/[.!?,;:]["”’)]?$/.test(line)&&(!next||/^["“‘(]?[A-Z0-9]/.test(next));if(!line||heading){add(paragraph,title);paragraph='';return}paragraph+=' '+line});add(paragraph,title)}
+  return {sentences,postings}}
+ // Sentences that use a collocation (or a word), shortest first.
+ function originalsFor(index,phrase,limit=2){const want=tokens(phrase,true);if(!index||!want.length)return [];const first=want[0],ids=new Set();
+  for(const [t,list] of index.postings)if(t===first||t.length>=3&&first.length>=3&&(t.startsWith(first)||first.startsWith(t)))for(const id of list)ids.add(id);
+  return [...ids].map(id=>index.sentences[id]).filter(s=>usesPhrase(s.text,phrase)).sort((a,b)=>a.text.length-b.text.length).slice(0,limit)}
  // An AI-written example is kept only if it parses, is a sentence of sensible length and really uses the collocation.
  function parseExample(text,phrase){const raw=String(text),json=raw.slice(raw.indexOf('{'),raw.lastIndexOf('}')+1);let v;try{v=JSON.parse(json)}catch{throw Error('AI 返回的例句格式不对')}
   const en=String(v?.en||'').trim(),zh=String(v?.zh||'').trim(),n=(en.match(/[A-Za-z]+/g)||[]).length;if(!en||!zh||n<4||n>45)throw Error('AI 返回的例句不完整');if(!usesPhrase(en,phrase))throw Error('AI 写的例句没有用上这个搭配');return {en,zh}}
@@ -152,5 +165,5 @@
  function newFrom(words,progress,level){const from=CEFR.indexOf(level);return from<=0?words:words.filter(w=>progress[key(w.word)]||!CEFR.includes(w.cefr)||CEFR.indexOf(w.cefr)>=from)}
  // A card forgotten or first met moments ago can't be mastered yet: while it is in its short relearning step, 精通 counts as 简单.
  const effectiveRating=(prior,rating)=>rating==='mastered'&&prior&&prior.interval<1?'easy':rating;
- const api={key,day,parse,knownGoal,variantOf,senses,collocationSenses,itemKey,senseItems,phraseItems,usesPhrase,parseExample,lookupWord,effectiveRating,CEFR,newFrom,queue,grade,today,overall,tomorrow,level,levelTable,legacyPeak,MASTERED_DAYS,ALGORITHMS,KEY_ACTIONS,KEY_PRESETS,DEFAULT_PRESET,normalizeCode,bindable,keyLabel,keyBindings,bindKey,keyPreset,keyAction};if(typeof module!=='undefined')module.exports=api;else root.Vocab=api;
+ const api={key,day,parse,knownGoal,variantOf,senses,collocationSenses,itemKey,senseItems,phraseItems,usesPhrase,parseExample,lookupWord,sentenceIndex,originalsFor,effectiveRating,CEFR,newFrom,queue,grade,today,overall,tomorrow,level,levelTable,legacyPeak,MASTERED_DAYS,ALGORITHMS,KEY_ACTIONS,KEY_PRESETS,DEFAULT_PRESET,normalizeCode,bindable,keyLabel,keyBindings,bindKey,keyPreset,keyAction};if(typeof module!=='undefined')module.exports=api;else root.Vocab=api;
 })(globalThis);
