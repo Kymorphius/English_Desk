@@ -30,10 +30,12 @@ function handle(name,fn){ipcMain.handle(name,(e,...args)=>{if(!trusted(e))throw 
 const apiKeyPath=path.join(app.getPath('userData'),'api-keys.json');
 async function readApiKeys(){try{return JSON.parse(await fs.readFile(apiKeyPath,'utf8'))}catch{return{}}}
 function keySlot(provider){if(typeof provider!=='string'||!provider||provider.length>300)throw Error('无效的服务商');return provider}
-handle('get-api-key',async provider=>{const stored=(await readApiKeys())[keySlot(provider)];if(!stored||!safeStorage.isEncryptionAvailable())return '';try{return safeStorage.decryptString(Buffer.from(stored,'base64'))}catch{return ''}});
-handle('set-api-key',async(provider,key)=>{const keys=await readApiKeys(),slot=keySlot(provider);key=String(key||'').trim();
- if(!key)delete keys[slot];else{if(!safeStorage.isEncryptionAvailable())throw Error('系统加密不可用，密钥未保存');if(key.length>2000)throw Error('密钥过长');keys[slot]=safeStorage.encryptString(key).toString('base64')}
- await fs.mkdir(app.getPath('userData'),{recursive:true});await fs.writeFile(apiKeyPath,JSON.stringify(keys),{mode:0o600});return true});
+async function writeApiKeys(keys){await fs.mkdir(app.getPath('userData'),{recursive:true});await fs.writeFile(apiKeyPath,JSON.stringify(keys),{mode:0o600})}
+async function savedApiKey(slot){const keys=await readApiKeys(),stored=keys[keySlot(slot)];if(!stored)return '';if(!await safeStorage.isAsyncEncryptionAvailable())throw Error('系统加密不可用，无法读取已保存的密钥');let decrypted;try{decrypted=await safeStorage.decryptStringAsync(Buffer.from(stored,'base64'))}catch{throw Error('无法读取已保存的密钥，请在设置中重新填写')}
+ if(decrypted.shouldReEncrypt){keys[slot]=(await safeStorage.encryptStringAsync(decrypted.result)).toString('base64');await writeApiKeys(keys).catch(console.error)}return decrypted.result}
+handle('has-api-key',async slot=>Boolean((await readApiKeys())[keySlot(slot)]));
+handle('set-api-key',async(slot,key)=>{key=String(key||'').trim();if(!key)return false;if(key.length>2000)throw Error('密钥过长');if(!await safeStorage.isAsyncEncryptionAvailable())throw Error('系统加密不可用，密钥未保存');const encrypted=(await safeStorage.encryptStringAsync(key)).toString('base64'),keys=await readApiKeys();keys[keySlot(slot)]=encrypted;await writeApiKeys(keys);return true});
+handle('delete-api-key',async slot=>{const keys=await readApiKeys();delete keys[keySlot(slot)];await writeApiKeys(keys);return true});
 const reminders=require('./word-reminder.cjs').createReminder(path.join(app.getPath('userData'),'word-reminder.json'),()=>{
  if(!Notification.isSupported())return false;
  const notification=new Notification({title:'English Desk · 背词提醒',body:'今天的单词可以开始复习了。点击打开背词面板。'});
@@ -66,22 +68,10 @@ handle('open-text-file',kind=>standaloneDialog(async()=>{
 handle('save-recording',async bytes=>{if(!Array.isArray(bytes)||bytes.length>30e6)throw Error('录音过大');return standaloneDialog(async()=>{const r=nativePanel?{filePath:nativePanel.selectFile('recording')}:await dialog.showSaveDialog({defaultPath:'speaking.webm',filters:[{name:'WebM audio',extensions:['webm']}]});if(r.canceled||!r.filePath)return false;await fs.writeFile(r.filePath,Buffer.from(bytes));return true})});
 const {ai}=require('./ai-client.cjs');
 handle('ai',payload=>ai(payload));
-// Boss key: a global shortcut that hides the panel at once (and stops speech), or brings it back.
-const {globalShortcut}=require('electron');
-const bossKeyPath=path.join(app.getPath('userData'),'boss-key.json');
-let bossKey='Alt+`',bossKeyActive=false;
-function bossToggle(){if(quitting||!win)return;const shown=nativePanel?JSON.parse(nativePanel.inspect()).shown:win.isVisible();if(!shown)return showPanel();win.webContents.send('boss-key');if(nativePanel)nativePanel.hide();else win.hide()}
-function registerBossKey(key){if(bossKeyActive)globalShortcut.unregister(bossKey);bossKeyActive=false;if(!key)return true;try{bossKeyActive=globalShortcut.register(key,bossToggle)}catch{bossKeyActive=false}return bossKeyActive}
-// ⌘ (Ctrl on Windows) plus one key is how apps and the system spell copy, paste, tab switching…; a global boss key must not take those.
-const primaryOnly=key=>{const mods=key.split('+').slice(0,-1).filter(m=>m!=='Shift');return mods.length===1&&mods[0]===(process.platform==='darwin'?'Command':'Control')};
-const validBossKey=key=>key===''||(key.length<=40&&/^((Command|Control|Alt|Shift)\+)+[^+]+$/.test(key)&&/(Command|Control|Alt)\+/.test(key)&&!primaryOnly(key));
-handle('get-boss-key',()=>({key:bossKey,active:bossKeyActive}));
-handle('pause-boss-key',paused=>{if(paused){if(bossKeyActive)globalShortcut.unregister(bossKey);bossKeyActive=false}else registerBossKey(bossKey);return {key:bossKey,active:bossKeyActive}});
-handle('set-boss-key',async key=>{key=key==null?'':String(key);if(!validBossKey(key))throw Error(primaryOnly(key)?'这个组合是常用的系统或应用快捷键，请再加上 ⌥ 或 ⌃':'老板键需要包含 ⌘、⌃ 或 ⌥ 中的至少一个');const prev=bossKey;
- if(!registerBossKey(key)){bossKey=prev;registerBossKey(prev);throw Error('这个组合已被其他应用占用，请换一个')}
- bossKey=key;await fs.mkdir(app.getPath('userData'),{recursive:true});await fs.writeFile(bossKeyPath,JSON.stringify({key}));return {key,active:bossKeyActive}});
-app.on('will-quit',()=>globalShortcut.unregisterAll());
-app.whenReady().then(async()=>{try{const saved=JSON.parse(await fs.readFile(bossKeyPath,'utf8')).key;if(typeof saved==='string'&&validBossKey(saved))bossKey=saved}catch{}registerBossKey(bossKey);if(process.env.ENGLISH_DESK_TEST==='1')app.testBossToggle=bossToggle});
+// Where the menu bar panel opens: under its status item (default) or at the left of the screen.
+const placementPath=path.join(app.getPath('userData'),'panel-placement.json');
+handle('get-panel-placement',async()=>{try{return JSON.parse(await fs.readFile(placementPath,'utf8')).placement==='left'?'left':'icon'}catch{return 'icon'}});
+handle('set-panel-placement',async placement=>{placement=placement==='left'?'left':'icon';nativePanel?.setPlacement(placement);await fs.mkdir(app.getPath('userData'),{recursive:true});await fs.writeFile(placementPath,JSON.stringify({placement}));return placement});
 app.whenReady().then(async()=>{
  await fs.mkdir(app.getPath('userData'),{recursive:true});await reminders.load();
  const updatePref=path.join(app.getPath('userData'),'updates.json');
@@ -102,6 +92,7 @@ app.whenReady().then(async()=>{
  win.setAlwaysOnTop(pinned);
  if(process.platform==='darwin'){
   nativePanel=require('../native/macos/popover.node');
+  try{nativePanel.setPlacement(JSON.parse(require('node:fs').readFileSync(placementPath,'utf8')).placement)}catch{}
   if(process.env.ENGLISH_DESK_TEST==='1')app.testPanel=nativePanel;
   nativePanel.create(win.getNativeWindowHandle(),pinned,event=>{
    if(event==='show')win.webContents.focus();
