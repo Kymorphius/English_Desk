@@ -37,4 +37,6 @@ const example=`你是雅思英语老师。学习者收藏了一个英语搭配�
 2. 自然地道，贴近雅思写作或口语话题，12–25 个词，其余用词不超过 B2 水平。
 3. 给出准确、通顺的中文翻译。
 只输出 JSON，不要其他文字：{"en":"英文例句","zh":"中文翻译"}`;
-module.exports={review,plan,validate,example};
+// A word the list doesn't have, explained where the learner met it.
+const explain=`你是雅思英语老师。学习者在一个句子或搭配里遇到不认识的英文单词。请用中文简要解释这个词在这里的意思，先写词性和释义，必要时补一句用法，总共不超过 60 个字。只输出解释本身。`;
+module.exports={review,plan,validate,example,explain};

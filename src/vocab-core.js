@@ -130,6 +130,10 @@
  const tokens=(s,skip)=>(String(s).toLowerCase().replace(/['’]s\b/g,'').match(/[a-z]+/g)||[]).filter(t=>!skip||!PLACEHOLDERS.has(t)).map(t=>stem(IRREGULAR[t]||t));
  function usesPhrase(sentence,phrase){const want=tokens(phrase,true),got=tokens(sentence),same=(t,w)=>t===w||t.length>=3&&w.length>=3&&(t.startsWith(w)||w.startsWith(t));if(!want.length)return false;
   for(let s=0;s<got.length;s++){if(!same(got[s],want[0]))continue;let i=1,last=s;for(let j=s+1;j<got.length&&i<want.length&&j-last<=4;j++)if(same(got[j],want[i])){i++;last=j}if(i===want.length)return true}return false}
+ // The list entry for a word as it appears in text: "suspended" → suspend, "paid" → pay, "studies" → study, "stopped" → stop.
+ function lookupWord(token,has){const t=String(token).toLowerCase().replace(/[’']s$/,'').replace(/’/g,"'"),c=[t,IRREGULAR[t]];if(t.endsWith('ies'))c.push(t.slice(0,-3)+'y');if(t.endsWith('es'))c.push(t.slice(0,-2));if(t.endsWith('s'))c.push(t.slice(0,-1));
+  for(const suffix of ['ed','ing'])if(t.endsWith(suffix)){const b=t.slice(0,-suffix.length);c.push(b,b+'e');if(/(.)\1$/.test(b))c.push(b.slice(0,-1));if(b.endsWith('i'))c.push(b.slice(0,-1)+'y')}
+  return c.find(x=>x&&has(x))||null}
  // An AI-written example is kept only if it parses, is a sentence of sensible length and really uses the collocation.
  function parseExample(text,phrase){const raw=String(text),json=raw.slice(raw.indexOf('{'),raw.lastIndexOf('}')+1);let v;try{v=JSON.parse(json)}catch{throw Error('AI 返回的例句格式不对')}
   const en=String(v?.en||'').trim(),zh=String(v?.zh||'').trim(),n=(en.match(/[A-Za-z]+/g)||[]).length;if(!en||!zh||n<4||n>45)throw Error('AI 返回的例句不完整');if(!usesPhrase(en,phrase))throw Error('AI 写的例句没有用上这个搭配');return {en,zh}}
@@ -148,5 +152,5 @@
  function newFrom(words,progress,level){const from=CEFR.indexOf(level);return from<=0?words:words.filter(w=>progress[key(w.word)]||!CEFR.includes(w.cefr)||CEFR.indexOf(w.cefr)>=from)}
  // A card forgotten or first met moments ago can't be mastered yet: while it is in its short relearning step, 精通 counts as 简单.
  const effectiveRating=(prior,rating)=>rating==='mastered'&&prior&&prior.interval<1?'easy':rating;
- const api={key,day,parse,knownGoal,variantOf,senses,collocationSenses,itemKey,senseItems,phraseItems,usesPhrase,parseExample,effectiveRating,CEFR,newFrom,queue,grade,today,overall,tomorrow,level,levelTable,legacyPeak,MASTERED_DAYS,ALGORITHMS,KEY_ACTIONS,KEY_PRESETS,DEFAULT_PRESET,normalizeCode,bindable,keyLabel,keyBindings,bindKey,keyPreset,keyAction};if(typeof module!=='undefined')module.exports=api;else root.Vocab=api;
+ const api={key,day,parse,knownGoal,variantOf,senses,collocationSenses,itemKey,senseItems,phraseItems,usesPhrase,parseExample,lookupWord,effectiveRating,CEFR,newFrom,queue,grade,today,overall,tomorrow,level,levelTable,legacyPeak,MASTERED_DAYS,ALGORITHMS,KEY_ACTIONS,KEY_PRESETS,DEFAULT_PRESET,normalizeCode,bindable,keyLabel,keyBindings,bindKey,keyPreset,keyAction};if(typeof module!=='undefined')module.exports=api;else root.Vocab=api;
 })(globalThis);
