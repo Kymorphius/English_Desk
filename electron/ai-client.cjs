@@ -1,5 +1,6 @@
 'use strict';
 const {runWorkflow}=require('./ai-workflow.cjs');
+const prompts=require('./prompts.cjs');
 const localModels=['qwen3.5:4b','qwen3:8b','qwen3.5:9b','qwen3:0.6b'];
 function permanent(message){return Object.assign(Error(message),{retryable:false})}
 async function ai({config,task,prompt,audio},onStage){
@@ -33,6 +34,7 @@ async function ai({config,task,prompt,audio},onStage){
   const output=local?data.message?.content:data.choices?.[0]?.message?.content;if(typeof output!=='string'||!output.trim())throw Error('接口没有返回有效文本');return output;
  };
  if(task==='probe')return generate([{role:'user',content:'Reply with exactly: Ready'}],'validate');
+ if(task==='example')return generate([{role:'system',content:prompts.example},{role:'user',content:input}],'generate'); // checked in the page: it must parse and use the collocation
  return runWorkflow({prompt:input,task,generate,onStage});
 }
 module.exports={ai};

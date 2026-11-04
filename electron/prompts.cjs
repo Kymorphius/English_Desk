@@ -30,4 +30,11 @@ const validate=`你是独立复核环节，评估候选文本是否遵守原请�
 - 是否按要求使用中文说明，是否答非所问或输出被截断？
 发现问题必须引用候选中的短语并说明违反哪一条，不凭空寻找错误。不要仅因措辞不合个人偏好就驳回。
 仅输出合法 JSON，不要代码块。结构：{"passed":true,"issues":[]}。有问题则 passed=false，issues 为最多3条具体问题的字符串数组；通过时 issues 必须为空。不得把这种检查视为事实证明或雅思评分。`;
-module.exports={review,plan,validate};
+// An example for a collocation the learner saved: one natural sentence that really uses it, with a faithful translation.
+const example=`你是雅思英语老师。学习者收藏了一个英语搭配，请写一个使用它的英文例句。
+要求：
+1. 句子必须使用这个搭配，可按语法变形（时态、单复数等），sb/sth 换成具体内容。
+2. 自然地道，贴近雅思写作或口语话题，12–25 个词，其余用词不超过 B2 水平。
+3. 给出准确、通顺的中文翻译。
+只输出 JSON，不要其他文字：{"en":"英文例句","zh":"中文翻译"}`;
+module.exports={review,plan,validate,example};
