@@ -30,10 +30,12 @@ function handle(name,fn){ipcMain.handle(name,(e,...args)=>{if(!trusted(e))throw 
 const apiKeyPath=path.join(app.getPath('userData'),'api-keys.json');
 async function readApiKeys(){try{return JSON.parse(await fs.readFile(apiKeyPath,'utf8'))}catch{return{}}}
 function keySlot(provider){if(typeof provider!=='string'||!provider||provider.length>300)throw Error('无效的服务商');return provider}
-handle('get-api-key',async provider=>{const stored=(await readApiKeys())[keySlot(provider)];if(!stored||!safeStorage.isEncryptionAvailable())return '';try{return safeStorage.decryptString(Buffer.from(stored,'base64'))}catch{return ''}});
-handle('set-api-key',async(provider,key)=>{const keys=await readApiKeys(),slot=keySlot(provider);key=String(key||'').trim();
- if(!key)delete keys[slot];else{if(!safeStorage.isEncryptionAvailable())throw Error('系统加密不可用，密钥未保存');if(key.length>2000)throw Error('密钥过长');keys[slot]=safeStorage.encryptString(key).toString('base64')}
- await fs.mkdir(app.getPath('userData'),{recursive:true});await fs.writeFile(apiKeyPath,JSON.stringify(keys),{mode:0o600});return true});
+async function writeApiKeys(keys){await fs.mkdir(app.getPath('userData'),{recursive:true});await fs.writeFile(apiKeyPath,JSON.stringify(keys),{mode:0o600})}
+async function savedApiKey(slot){const keys=await readApiKeys(),stored=keys[keySlot(slot)];if(!stored)return '';if(!await safeStorage.isAsyncEncryptionAvailable())throw Error('系统加密不可用，无法读取已保存的密钥');let decrypted;try{decrypted=await safeStorage.decryptStringAsync(Buffer.from(stored,'base64'))}catch{throw Error('无法读取已保存的密钥，请在设置中重新填写')}
+ if(decrypted.shouldReEncrypt){keys[slot]=(await safeStorage.encryptStringAsync(decrypted.result)).toString('base64');await writeApiKeys(keys).catch(console.error)}return decrypted.result}
+handle('has-api-key',async slot=>Boolean((await readApiKeys())[keySlot(slot)]));
+handle('set-api-key',async(slot,key)=>{key=String(key||'').trim();if(!key)return false;if(key.length>2000)throw Error('密钥过长');if(!await safeStorage.isAsyncEncryptionAvailable())throw Error('系统加密不可用，密钥未保存');const encrypted=(await safeStorage.encryptStringAsync(key)).toString('base64'),keys=await readApiKeys();keys[keySlot(slot)]=encrypted;await writeApiKeys(keys);return true});
+handle('delete-api-key',async slot=>{const keys=await readApiKeys();delete keys[keySlot(slot)];await writeApiKeys(keys);return true});
 const reminders=require('./word-reminder.cjs').createReminder(path.join(app.getPath('userData'),'word-reminder.json'),()=>{
  if(!Notification.isSupported())return false;
  const notification=new Notification({title:'English Desk · 背词提醒',body:'今天的单词可以开始复习了。点击打开背词面板。'});
@@ -66,6 +68,10 @@ handle('open-text-file',kind=>standaloneDialog(async()=>{
 handle('save-recording',async bytes=>{if(!Array.isArray(bytes)||bytes.length>30e6)throw Error('录音过大');return standaloneDialog(async()=>{const r=nativePanel?{filePath:nativePanel.selectFile('recording')}:await dialog.showSaveDialog({defaultPath:'speaking.webm',filters:[{name:'WebM audio',extensions:['webm']}]});if(r.canceled||!r.filePath)return false;await fs.writeFile(r.filePath,Buffer.from(bytes));return true})});
 const {ai}=require('./ai-client.cjs');
 handle('ai',payload=>ai(payload));
+// Where the menu bar panel opens: under its status item (default) or at the left of the screen.
+const placementPath=path.join(app.getPath('userData'),'panel-placement.json');
+handle('get-panel-placement',async()=>{try{return JSON.parse(await fs.readFile(placementPath,'utf8')).placement==='left'?'left':'icon'}catch{return 'icon'}});
+handle('set-panel-placement',async placement=>{placement=placement==='left'?'left':'icon';nativePanel?.setPlacement(placement);await fs.mkdir(app.getPath('userData'),{recursive:true});await fs.writeFile(placementPath,JSON.stringify({placement}));return placement});
 app.whenReady().then(async()=>{
  await fs.mkdir(app.getPath('userData'),{recursive:true});await reminders.load();
  const updatePref=path.join(app.getPath('userData'),'updates.json');
@@ -86,6 +92,7 @@ app.whenReady().then(async()=>{
  win.setAlwaysOnTop(pinned);
  if(process.platform==='darwin'){
   nativePanel=require('../native/macos/popover.node');
+  try{nativePanel.setPlacement(JSON.parse(require('node:fs').readFileSync(placementPath,'utf8')).placement)}catch{}
   if(process.env.ENGLISH_DESK_TEST==='1')app.testPanel=nativePanel;
   nativePanel.create(win.getNativeWindowHandle(),pinned,event=>{
    if(event==='show')win.webContents.focus();
