@@ -129,5 +129,7 @@
  // studied keep their reviews, and imported words without a level are always included.
  const CEFR=['A1','A2','B1','B2','C1','C2'];
  function newFrom(words,progress,level){const from=CEFR.indexOf(level);return from<=0?words:words.filter(w=>progress[key(w.word)]||!CEFR.includes(w.cefr)||CEFR.indexOf(w.cefr)>=from)}
- const api={key,day,parse,knownGoal,variantOf,senses,collocationSenses,itemKey,senseItems,CEFR,newFrom,queue,grade,today,overall,tomorrow,level,levelTable,legacyPeak,MASTERED_DAYS,ALGORITHMS,KEY_ACTIONS,KEY_PRESETS,DEFAULT_PRESET,normalizeCode,bindable,keyLabel,keyBindings,bindKey,keyPreset,keyAction};if(typeof module!=='undefined')module.exports=api;else root.Vocab=api;
+ // A card forgotten or first met moments ago can't be mastered yet: while it is in its short relearning step, 精通 counts as 简单.
+ const effectiveRating=(prior,rating)=>rating==='mastered'&&prior&&prior.interval<1?'easy':rating;
+ const api={key,day,parse,knownGoal,variantOf,senses,collocationSenses,itemKey,senseItems,effectiveRating,CEFR,newFrom,queue,grade,today,overall,tomorrow,level,levelTable,legacyPeak,MASTERED_DAYS,ALGORITHMS,KEY_ACTIONS,KEY_PRESETS,DEFAULT_PRESET,normalizeCode,bindable,keyLabel,keyBindings,bindKey,keyPreset,keyAction};if(typeof module!=='undefined')module.exports=api;else root.Vocab=api;
 })(globalThis);
