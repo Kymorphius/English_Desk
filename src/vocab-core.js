@@ -115,15 +115,19 @@
  function senses(meaning){const m=String(meaning||'').trim(),marks=[...m.matchAll(POS_TAG)],out=[];if(!marks.length)return m?[{pos:'',text:m}]:[];
   if(marks[0].index>0)out.push({pos:'',text:m.slice(0,marks[0].index)});
   marks.forEach((x,i)=>out.push({pos:x[2],text:m.slice(x.index+x[0].length,i+1<marks.length?marks[i+1].index:m.length).replace(/[；;\s]+$/,'')}));return out.filter(x=>x.text)}
+ // Collocations ("dilated pupils｜扩大的瞳孔") aren't tied to a sense in the data. Each goes to the sense sharing the most two-character
+ // words with its Chinese (ties to the earlier, usually main, sense); single characters are too loose ("出席" vs "提出"), so no overlap means none.
+ function collocationSenses(col,parts){const pairs=t=>{const s=String(t).replace(/[；;，,。、（）()…\s]/g,''),out=new Set();for(let i=0;i+2<=s.length;i++)out.add(s.slice(i,i+2));return out};const sense=parts.map(p=>pairs(p.text));
+  return (col||[]).map(c=>{const g=pairs(String(c).split('｜')[1]||''),scores=sense.map(s=>[...s].filter(x=>g.has(x)).length),best=Math.max(0,...scores);return best?scores.indexOf(best):-1})}
  // A sense marked 生义 becomes its own card, studied like a new word. Its key sets it apart from the word, so each keeps its own schedule.
  const itemKey=w=>w.sense?`${key(w.word)}#${w.sense.text}`:key(w.word);
  function senseItems(words,rareSenses){const byKey=new Map(words.map(w=>[key(w.word),w])),fmt=p=>(p.pos?p.pos+' ':'')+p.text,out=[];
   for(const [k,texts] of Object.entries(rareSenses||{})){const w=byKey.get(k),parts=w?senses(w.meaning):[];if(parts.length<2||!Array.isArray(texts))continue;
-   for(const text of texts){const s=parts.find(p=>p.text===text);if(s)out.push({word:w.word,uk:w.uk,us:w.us,cefr:w.cefr,meaning:fmt(s),sense:{text:s.text,pos:s.pos,others:parts.filter(p=>p!==s).map(fmt),known:parts.filter(p=>!texts.includes(p.text)).map(p=>p.text)}})}}
+   const owner=collocationSenses(w.col,parts);for(const text of texts){const j=parts.findIndex(p=>p.text===text),s=parts[j];if(s)out.push({word:w.word,uk:w.uk,us:w.us,cefr:w.cefr,meaning:fmt(s),def:w.en?.[j]||'',col:(w.col||[]).filter((c,i)=>owner[i]===j),sense:{text:s.text,pos:s.pos,others:parts.filter(p=>p!==s).map(fmt),known:parts.filter(p=>!texts.includes(p.text)).map(p=>p.text)}})}}
   return out}
  // The built-in list runs from A1 to C2 (CEFR). Starting new words at a higher level skips the easier ones; words already
  // studied keep their reviews, and imported words without a level are always included.
  const CEFR=['A1','A2','B1','B2','C1','C2'];
  function newFrom(words,progress,level){const from=CEFR.indexOf(level);return from<=0?words:words.filter(w=>progress[key(w.word)]||!CEFR.includes(w.cefr)||CEFR.indexOf(w.cefr)>=from)}
- const api={key,day,parse,knownGoal,variantOf,senses,itemKey,senseItems,CEFR,newFrom,queue,grade,today,overall,tomorrow,level,levelTable,legacyPeak,MASTERED_DAYS,ALGORITHMS,KEY_ACTIONS,KEY_PRESETS,DEFAULT_PRESET,normalizeCode,bindable,keyLabel,keyBindings,bindKey,keyPreset,keyAction};if(typeof module!=='undefined')module.exports=api;else root.Vocab=api;
+ const api={key,day,parse,knownGoal,variantOf,senses,collocationSenses,itemKey,senseItems,CEFR,newFrom,queue,grade,today,overall,tomorrow,level,levelTable,legacyPeak,MASTERED_DAYS,ALGORITHMS,KEY_ACTIONS,KEY_PRESETS,DEFAULT_PRESET,normalizeCode,bindable,keyLabel,keyBindings,bindKey,keyPreset,keyAction};if(typeof module!=='undefined')module.exports=api;else root.Vocab=api;
 })(globalThis);
