@@ -13,11 +13,14 @@ function showPanel(){
  if(nativePanel){nativePanel.show();return;}
  if(!tray)return;
  const bounds=tray.getBounds();const area=screen.getDisplayMatching(bounds).workArea;
- let [width,height]=win.getSize();
- width=Math.min(width,area.width);height=Math.min(height,area.height);win.setSize(width,height);
+ // Use the panel's own size rather than reading it back: under fractional scaling (e.g. 150%) getSize/setSize drift by a pixel or two,
+ // so the panel grew on every show and visibly resized as it appeared. Move and size in one call, and only when something changed.
+ const width=Math.min(400,area.width),height=Math.min(720,area.height);
  const x=Math.max(area.x,Math.min(bounds.x+bounds.width-width,area.x+area.width-width));
  const y=bounds.y<area.y+area.height/2?area.y:area.y+area.height-height;
- win.setPosition(Math.round(x),Math.round(Math.max(area.y,y)));win.show();win.focus();
+ const next={x:Math.round(x),y:Math.round(Math.max(area.y,y)),width,height},current=win.getBounds();
+ if(['x','y','width','height'].some(k=>current[k]!==next[k]))win.setBounds(next);
+ win.show();win.focus();
 }
 function trayMenu(){return Menu.buildFromTemplate([
  {label:'打开 English Desk',click:showPanel},
