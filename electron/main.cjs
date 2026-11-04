@@ -67,8 +67,11 @@ handle('open-text-file',kind=>standaloneDialog(async()=>{
 }));
 handle('save-recording',async bytes=>{if(!Array.isArray(bytes)||bytes.length>30e6)throw Error('录音过大');return standaloneDialog(async()=>{const r=nativePanel?{filePath:nativePanel.selectFile('recording')}:await dialog.showSaveDialog({defaultPath:'speaking.webm',filters:[{name:'WebM audio',extensions:['webm']}]});if(r.canceled||!r.filePath)return false;await fs.writeFile(r.filePath,Buffer.from(bytes));return true})});
 const {ai}=require('./ai-client.cjs');
-// Saved keys are decrypted only here, when a request is actually made, so launching the app never touches the keychain.
-handle('ai',async payload=>{const {key_slot,...config}=payload?.config||{};if(!config.api_key&&key_slot)config.api_key=await savedApiKey(key_slot);return ai({...payload,config})});
+handle('ai',payload=>ai(payload));
+// Where the menu bar panel opens: under its status item (default) or at the left of the screen.
+const placementPath=path.join(app.getPath('userData'),'panel-placement.json');
+handle('get-panel-placement',async()=>{try{return JSON.parse(await fs.readFile(placementPath,'utf8')).placement==='left'?'left':'icon'}catch{return 'icon'}});
+handle('set-panel-placement',async placement=>{placement=placement==='left'?'left':'icon';nativePanel?.setPlacement(placement);await fs.mkdir(app.getPath('userData'),{recursive:true});await fs.writeFile(placementPath,JSON.stringify({placement}));return placement});
 app.whenReady().then(async()=>{
  await fs.mkdir(app.getPath('userData'),{recursive:true});await reminders.load();
  const updatePref=path.join(app.getPath('userData'),'updates.json');
@@ -89,6 +92,7 @@ app.whenReady().then(async()=>{
  win.setAlwaysOnTop(pinned);
  if(process.platform==='darwin'){
   nativePanel=require('../native/macos/popover.node');
+  try{nativePanel.setPlacement(JSON.parse(require('node:fs').readFileSync(placementPath,'utf8')).placement)}catch{}
   if(process.env.ENGLISH_DESK_TEST==='1')app.testPanel=nativePanel;
   nativePanel.create(win.getNativeWindowHandle(),pinned,event=>{
    if(event==='show')win.webContents.focus();
