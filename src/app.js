@@ -171,6 +171,7 @@ function settings(){header('设置','v'+(window.desktop?.version||'0.2.8')+' · 
  $('#testApi').onclick=async()=>{const button=$('#testApi'),status=$('#apiStatus');if(!window.desktop){status.textContent='请在桌面插件中测试连接。';return}const test=apiFormConfig();if(!test.base_url&&!test.api_key){status.textContent='请先选择服务商并填写密钥。';return}button.disabled=true;status.textContent='正在测试连接…';const start=performance.now();try{const result=await desktop.ai({config:test,task:'probe',prompt:'Reply with exactly: Ready'});status.textContent=`连接成功（${((performance.now()-start)/1000).toFixed(1)} 秒）：${result}`}catch(e){status.textContent='连接失败：'+ipcMessage(e)}finally{button.disabled=false}};
  updateAppSettings();
  appearanceSettings();
+ bossKeySettings();
  wordImportSettings();
  reminderSettings();
  $('#speechAccent').onchange=e=>{stopSpeech();state.speechAccent=e.target.value;save();toast('朗读口音已保存')};$('#previewSpeech').onclick=()=>speak('I usually spend my free time reading books and exploring new places.');$('#stopPreview').onclick=stopSpeech;
