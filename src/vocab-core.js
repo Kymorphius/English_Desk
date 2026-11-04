@@ -119,7 +119,11 @@
  const itemKey=w=>w.sense?`${key(w.word)}#${w.sense.text}`:key(w.word);
  function senseItems(words,rareSenses){const byKey=new Map(words.map(w=>[key(w.word),w])),fmt=p=>(p.pos?p.pos+' ':'')+p.text,out=[];
   for(const [k,texts] of Object.entries(rareSenses||{})){const w=byKey.get(k),parts=w?senses(w.meaning):[];if(parts.length<2||!Array.isArray(texts))continue;
-   for(const text of texts){const s=parts.find(p=>p.text===text);if(s)out.push({word:w.word,uk:w.uk,us:w.us,meaning:fmt(s),sense:{text:s.text,pos:s.pos,others:parts.filter(p=>p!==s).map(fmt),known:parts.filter(p=>!texts.includes(p.text)).map(p=>p.text)}})}}
+   for(const text of texts){const s=parts.find(p=>p.text===text);if(s)out.push({word:w.word,uk:w.uk,us:w.us,cefr:w.cefr,meaning:fmt(s),sense:{text:s.text,pos:s.pos,others:parts.filter(p=>p!==s).map(fmt),known:parts.filter(p=>!texts.includes(p.text)).map(p=>p.text)}})}}
   return out}
- const api={key,day,parse,knownGoal,variantOf,senses,itemKey,senseItems,queue,grade,today,overall,tomorrow,level,levelTable,legacyPeak,MASTERED_DAYS,ALGORITHMS,KEY_ACTIONS,KEY_PRESETS,DEFAULT_PRESET,normalizeCode,bindable,keyLabel,keyBindings,bindKey,keyPreset,keyAction};if(typeof module!=='undefined')module.exports=api;else root.Vocab=api;
+ // The built-in list runs from A1 to C2 (CEFR). Starting new words at a higher level skips the easier ones; words already
+ // studied keep their reviews, and imported words without a level are always included.
+ const CEFR=['A1','A2','B1','B2','C1','C2'];
+ function newFrom(words,progress,level){const from=CEFR.indexOf(level);return from<=0?words:words.filter(w=>progress[key(w.word)]||!CEFR.includes(w.cefr)||CEFR.indexOf(w.cefr)>=from)}
+ const api={key,day,parse,knownGoal,variantOf,senses,itemKey,senseItems,CEFR,newFrom,queue,grade,today,overall,tomorrow,level,levelTable,legacyPeak,MASTERED_DAYS,ALGORITHMS,KEY_ACTIONS,KEY_PRESETS,DEFAULT_PRESET,normalizeCode,bindable,keyLabel,keyBindings,bindKey,keyPreset,keyAction};if(typeof module!=='undefined')module.exports=api;else root.Vocab=api;
 })(globalThis);

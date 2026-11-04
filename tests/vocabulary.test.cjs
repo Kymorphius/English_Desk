@@ -19,3 +19,6 @@ test('marked senses become their own new cards ahead of new words, with their ow
  const cards=V.senseItems(words,{pupil:['瞳孔'],zeal:['热情'],gone:['x'],bank:['不存在']}),items=[...cards,...words];assert.equal(cards.length,1);assert.equal(V.itemKey(cards[0]),'pupil#瞳孔');assert.equal(V.itemKey(words[0]),'pupil');assert.deepEqual(cards[0].sense,{text:'瞳孔',pos:'n.',others:['n. 小学生；中学生'],known:['小学生；中学生']});
  const p={pupil:V.grade(null,'mastered',now)};assert.deepEqual(V.queue(items,p,2,now).map(V.itemKey),['pupil#瞳孔','zeal']);
  const p2={...p,'pupil#瞳孔':V.grade(null,'good',now)};assert.deepEqual(V.queue(items,p2,2,now).map(V.itemKey),['zeal']);assert.equal(V.today(items,p2,2,now).done,1);assert.equal(V.overall(words,p2).learned,1)});
+test('new words can start at a CEFR level; studied and imported words stay',()=>{const words=[{word:'library',cefr:'A1'},{word:'lost',cefr:'A2'},{word:'viable',cefr:'C1'},{word:'zeal'}],p={library:V.grade(null,'good',Date.now())};
+ assert.deepEqual(V.newFrom(words,p,'A1').map(w=>w.word),['library','lost','viable','zeal']);assert.deepEqual(V.newFrom(words,p,'B2').map(w=>w.word),['library','viable','zeal']);assert.deepEqual(V.newFrom(words,p,'nope').length,4);
+ assert.equal(V.senseItems([{word:'pupil',cefr:'A2',meaning:'n. 小学生；n. 瞳孔'}],{pupil:['瞳孔']})[0].cefr,'A2')});
