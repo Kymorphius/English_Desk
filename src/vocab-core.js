@@ -77,17 +77,18 @@
  // What waits tomorrow: reviews falling due before tomorrow ends, plus tomorrow's new words.
  function tomorrow(words,progress,limit,now=Date.now()){const end=new Date(now);end.setHours(0,0,0,0);end.setDate(end.getDate()+2);let reviews=0,fresh=0;for(const w of words){const p=progress[itemKey(w)];if(p){if(p.due<end.getTime())reviews++}else fresh++}return {reviews,fresh:Math.min(limit,fresh)}}
  // Keyboard bindings, stored as physical key codes so they work regardless of input method or keyboard layout.
- const KEY_ACTIONS=['flip','again','hard','good','easy','mastered','speak','undo','ignore','link','sense1','sense2','sense3'];
- const ADDED_ACTIONS=['undo','ignore','link','sense1','sense2','sense3']; // actions introduced after bindings could first be saved
- const KEY_PRESETS={digits:{flip:'Space',again:'Digit1',hard:'Digit2',good:'Digit3',easy:'Digit4',mastered:'Digit5',speak:'KeyR',undo:'KeyO',ignore:'KeyX',link:'KeyL',sense1:'KeyQ',sense2:'KeyW',sense3:'KeyE'},home:{flip:'Space',again:'KeyA',hard:'KeyS',good:'KeyD',easy:'KeyF',mastered:'KeyJ',speak:'KeyR',undo:'KeyO',ignore:'KeyX',link:'KeyL',sense1:'KeyQ',sense2:'KeyW',sense3:'KeyE'}};
+ const KEY_ACTIONS=['flip','again','hard','good','easy','mastered','speak','undo','ignore','link','sense1','sense2','sense3','col1','col2','col3','col4','col5','col6'];
+ const ADDED_ACTIONS=['undo','ignore','link','sense1','sense2','sense3','col1','col2','col3','col4','col5','col6']; // actions introduced after bindings could first be saved
+ const KEY_PRESETS={digits:{flip:'Space',again:'Digit1',hard:'Digit2',good:'Digit3',easy:'Digit4',mastered:'Digit5',speak:'KeyR',undo:'KeyO',ignore:'KeyX',link:'KeyL',sense1:'KeyQ',sense2:'KeyW',sense3:'KeyE',col1:'KeyZ',col2:'KeyC',col3:'KeyV',col4:'KeyB',col5:'KeyN',col6:'KeyM'},home:{flip:'Space',again:'KeyA',hard:'KeyS',good:'KeyD',easy:'KeyF',mastered:'KeyJ',speak:'KeyR',undo:'KeyO',ignore:'KeyX',link:'KeyL',sense1:'KeyQ',sense2:'KeyW',sense3:'KeyE',col1:'Digit1',col2:'Digit2',col3:'Digit3',col4:'Digit4',col5:'Digit5',col6:'Digit6'}};
  const DEFAULT_PRESET='home';
  const SYMBOLS={Space:'空格',Enter:'回车',Backspace:'⌫',ArrowLeft:'←',ArrowRight:'→',ArrowUp:'↑',ArrowDown:'↓',Semicolon:';',Quote:"'",Comma:',',Period:'.',Slash:'/',Backslash:'\\',BracketLeft:'[',BracketRight:']',Backquote:'`',Minus:'-',Equal:'='};
  const normalizeCode=code=>String(code||'').replace(/^Numpad(\d)$/,'Digit$1').replace(/^NumpadEnter$/,'Enter');
  const bindable=code=>/^(Key[A-Z]|Digit\d)$/.test(normalizeCode(code))||Object.hasOwn(SYMBOLS,normalizeCode(code));
  const keyLabel=code=>{code=normalizeCode(code);return SYMBOLS[code]||code.replace(/^Key|^Digit/,'')};
  function keyBindings(saved){saved=saved&&typeof saved==='object'?{...saved}:{};
-  // Bindings saved before an action existed get its default key, or the first free letter if that key is taken.
-  for(const a of ADDED_ACTIONS)if(!saved[a]&&Object.keys(saved).length){const used=new Set(Object.values(saved).map(normalizeCode)),free=[KEY_PRESETS[DEFAULT_PRESET][a],...'OPQUWXYZBCEGHIKLMNTV'.split('').map(c=>'Key'+c)].find(c=>!used.has(c));if(free)saved[a]=free}
+  // Bindings saved before an action existed get its key from the layout they follow (else the default layout, the other one, or the first free letter).
+  const layout=Object.values(KEY_PRESETS).find(p=>Object.entries(saved).every(([a,c])=>!KEY_ACTIONS.includes(a)||p[a]===normalizeCode(c)));
+  for(const a of ADDED_ACTIONS)if(!saved[a]&&Object.keys(saved).length){const used=new Set(Object.values(saved).map(normalizeCode)),free=[layout?.[a],KEY_PRESETS[DEFAULT_PRESET][a],...Object.values(KEY_PRESETS).map(p=>p[a]),...'OPQUWXYZBCEGHIKLMNTV'.split('').map(c=>'Key'+c)].find(c=>c&&!used.has(c));if(free)saved[a]=free}
   const b={...KEY_PRESETS[DEFAULT_PRESET],...saved};const codes=KEY_ACTIONS.map(a=>b[a]);return codes.every(bindable)&&new Set(codes).size===codes.length?Object.fromEntries(KEY_ACTIONS.map(a=>[a,normalizeCode(b[a])])):{...KEY_PRESETS[DEFAULT_PRESET]}}
  function bindKey(bindings,action,code){code=normalizeCode(code);if(!KEY_ACTIONS.includes(action)||!bindable(code))throw Error('无法绑定这个按键');const next={...bindings},other=KEY_ACTIONS.find(a=>a!==action&&next[a]===code);if(other)next[other]=bindings[action];next[action]=code;return {bindings:next,swapped:other||null}}
  const keyPreset=bindings=>Object.keys(KEY_PRESETS).find(p=>KEY_ACTIONS.every(a=>KEY_PRESETS[p][a]===bindings[a]))||'custom';
@@ -120,7 +121,12 @@
  function collocationSenses(col,parts){const pairs=t=>{const s=String(t).replace(/[；;，,。、（）()…\s]/g,''),out=new Set();for(let i=0;i+2<=s.length;i++)out.add(s.slice(i,i+2));return out};const sense=parts.map(p=>pairs(p.text));
   return (col||[]).map(c=>{const g=pairs(String(c).split('｜')[1]||''),scores=sense.map(s=>[...s].filter(x=>g.has(x)).length),best=Math.max(0,...scores);return best?scores.indexOf(best):-1})}
  // A sense marked 生义 becomes its own card, studied like a new word. Its key sets it apart from the word, so each keeps its own schedule.
- const itemKey=w=>w.sense?`${key(w.word)}#${w.sense.text}`:key(w.word);
+ const itemKey=w=>w.sense?`${key(w.word)}#${w.sense.text}`:w.phrase?`${key(w.word)}@${w.phrase.en.toLowerCase()}`:key(w.word);
+ // A saved collocation is its own card too: the Chinese and the word are the cue, the English collocation is the answer.
+ function phraseItems(words,phrases){const byKey=new Map(words.map(w=>[key(w.word),w])),out=[];
+  for(const [k,list] of Object.entries(phrases||{})){const w=byKey.get(k);if(!w||!Array.isArray(list))continue;
+   for(const raw of list){if(!(w.col||[]).includes(raw))continue;const [en,zh='']=raw.split('｜');out.push({word:w.word,uk:w.uk,us:w.us,cefr:w.cefr,meaning:w.meaning,example:w.example,translation:w.translation,phrase:{en,zh,raw}})}}
+  return out}
  function senseItems(words,rareSenses){const byKey=new Map(words.map(w=>[key(w.word),w])),fmt=p=>(p.pos?p.pos+' ':'')+p.text,out=[];
   for(const [k,texts] of Object.entries(rareSenses||{})){const w=byKey.get(k),parts=w?senses(w.meaning):[];if(parts.length<2||!Array.isArray(texts))continue;
    const owner=collocationSenses(w.col,parts);for(const text of texts){const j=parts.findIndex(p=>p.text===text),s=parts[j];if(s)out.push({word:w.word,uk:w.uk,us:w.us,cefr:w.cefr,meaning:fmt(s),def:w.en?.[j]||'',col:(w.col||[]).filter((c,i)=>owner[i]===j),sense:{text:s.text,pos:s.pos,others:parts.filter(p=>p!==s).map(fmt),known:parts.filter(p=>!texts.includes(p.text)).map(p=>p.text)}})}}
@@ -131,5 +137,5 @@
  function newFrom(words,progress,level){const from=CEFR.indexOf(level);return from<=0?words:words.filter(w=>progress[key(w.word)]||!CEFR.includes(w.cefr)||CEFR.indexOf(w.cefr)>=from)}
  // A card forgotten or first met moments ago can't be mastered yet: while it is in its short relearning step, 精通 counts as 简单.
  const effectiveRating=(prior,rating)=>rating==='mastered'&&prior&&prior.interval<1?'easy':rating;
- const api={key,day,parse,knownGoal,variantOf,senses,collocationSenses,itemKey,senseItems,effectiveRating,CEFR,newFrom,queue,grade,today,overall,tomorrow,level,levelTable,legacyPeak,MASTERED_DAYS,ALGORITHMS,KEY_ACTIONS,KEY_PRESETS,DEFAULT_PRESET,normalizeCode,bindable,keyLabel,keyBindings,bindKey,keyPreset,keyAction};if(typeof module!=='undefined')module.exports=api;else root.Vocab=api;
+ const api={key,day,parse,knownGoal,variantOf,senses,collocationSenses,itemKey,senseItems,phraseItems,effectiveRating,CEFR,newFrom,queue,grade,today,overall,tomorrow,level,levelTable,legacyPeak,MASTERED_DAYS,ALGORITHMS,KEY_ACTIONS,KEY_PRESETS,DEFAULT_PRESET,normalizeCode,bindable,keyLabel,keyBindings,bindKey,keyPreset,keyAction};if(typeof module!=='undefined')module.exports=api;else root.Vocab=api;
 })(globalThis);
