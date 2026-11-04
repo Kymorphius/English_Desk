@@ -19,10 +19,10 @@
   }return [...result.values()];
  }
  function queue(words,progress,limit,now=Date.now()){
-  const due=words.filter(w=>progress[key(w.word)]&&progress[key(w.word)].due<=now).sort((a,b)=>progress[key(a.word)].due-progress[key(b.word)].due);
+  const due=words.filter(w=>progress[itemKey(w)]&&progress[itemKey(w)].due<=now).sort((a,b)=>progress[itemKey(a)].due-progress[itemKey(b)].due);
   // Words marked mastered the first time they appear are already known, so they don't use up the daily quota.
   const introduced=Object.values(progress).filter(p=>p.introduced===day(now)&&!p.known).length;
-  return [...due,...words.filter(w=>!progress[key(w.word)]).slice(0,Math.max(0,limit-introduced))];
+  return [...due,...words.filter(w=>!progress[itemKey(w)]).slice(0,Math.max(0,limit-introduced))];
  }
  const DAY=86400000,RATINGS=['again','hard','good','easy','mastered'],GRADE={again:1,hard:2,good:3,easy:4,mastered:4};
  const ALGORITHMS=['classic','fsrs','sm2'];
@@ -68,14 +68,14 @@
  function today(words,progress,limit,now=Date.now()){
   const d=day(now),relearning=new Set(),done=new Set();
   let known=0;for(const [k,p] of Object.entries(progress)){if(!p.last||day(p.last)!==d)continue;if(p.known&&p.introduced===d)known++;else (p.interval<1?relearning:done).add(k)}
-  const pending=queue(words,progress,limit,now).filter(w=>!relearning.has(key(w.word))).length+relearning.size;
+  const pending=queue(words,progress,limit,now).filter(w=>!relearning.has(itemKey(w))).length+relearning.size;
   return {done:done.size,remaining:pending,total:done.size+pending,known};
  }
  // Overall progress. A word counts as mastered once its next review is at least 21 days away.
  const MASTERED_DAYS=21;
  function overall(words,progress){let learned=0,mastered=0;for(const w of words){const p=progress[key(w.word)];if(!p)continue;learned++;if(p.interval>=MASTERED_DAYS)mastered++}return {total:words.length,learned,mastered,learning:learned-mastered}}
  // What waits tomorrow: reviews falling due before tomorrow ends, plus tomorrow's new words.
- function tomorrow(words,progress,limit,now=Date.now()){const end=new Date(now);end.setHours(0,0,0,0);end.setDate(end.getDate()+2);let reviews=0,fresh=0;for(const w of words){const p=progress[key(w.word)];if(p){if(p.due<end.getTime())reviews++}else fresh++}return {reviews,fresh:Math.min(limit,fresh)}}
+ function tomorrow(words,progress,limit,now=Date.now()){const end=new Date(now);end.setHours(0,0,0,0);end.setDate(end.getDate()+2);let reviews=0,fresh=0;for(const w of words){const p=progress[itemKey(w)];if(p){if(p.due<end.getTime())reviews++}else fresh++}return {reviews,fresh:Math.min(limit,fresh)}}
  // Keyboard bindings, stored as physical key codes so they work regardless of input method or keyboard layout.
  const KEY_ACTIONS=['flip','again','hard','good','easy','mastered','speak','undo','ignore','link','sense1','sense2','sense3'];
  const ADDED_ACTIONS=['undo','ignore','link','sense1','sense2','sense3']; // actions introduced after bindings could first be saved
@@ -115,5 +115,11 @@
  function senses(meaning){const m=String(meaning||'').trim(),marks=[...m.matchAll(POS_TAG)],out=[];if(!marks.length)return m?[{pos:'',text:m}]:[];
   if(marks[0].index>0)out.push({pos:'',text:m.slice(0,marks[0].index)});
   marks.forEach((x,i)=>out.push({pos:x[2],text:m.slice(x.index+x[0].length,i+1<marks.length?marks[i+1].index:m.length).replace(/[；;\s]+$/,'')}));return out.filter(x=>x.text)}
- const api={key,day,parse,knownGoal,variantOf,senses,queue,grade,today,overall,tomorrow,level,levelTable,legacyPeak,MASTERED_DAYS,ALGORITHMS,KEY_ACTIONS,KEY_PRESETS,DEFAULT_PRESET,normalizeCode,bindable,keyLabel,keyBindings,bindKey,keyPreset,keyAction};if(typeof module!=='undefined')module.exports=api;else root.Vocab=api;
+ // A sense marked 生义 becomes its own card, studied like a new word. Its key sets it apart from the word, so each keeps its own schedule.
+ const itemKey=w=>w.sense?`${key(w.word)}#${w.sense.text}`:key(w.word);
+ function senseItems(words,rareSenses){const byKey=new Map(words.map(w=>[key(w.word),w])),fmt=p=>(p.pos?p.pos+' ':'')+p.text,out=[];
+  for(const [k,texts] of Object.entries(rareSenses||{})){const w=byKey.get(k),parts=w?senses(w.meaning):[];if(parts.length<2||!Array.isArray(texts))continue;
+   for(const text of texts){const s=parts.find(p=>p.text===text);if(s)out.push({word:w.word,uk:w.uk,us:w.us,meaning:fmt(s),sense:{text:s.text,pos:s.pos,others:parts.filter(p=>p!==s).map(fmt),known:parts.filter(p=>!texts.includes(p.text)).map(p=>p.text)}})}}
+  return out}
+ const api={key,day,parse,knownGoal,variantOf,senses,itemKey,senseItems,queue,grade,today,overall,tomorrow,level,levelTable,legacyPeak,MASTERED_DAYS,ALGORITHMS,KEY_ACTIONS,KEY_PRESETS,DEFAULT_PRESET,normalizeCode,bindable,keyLabel,keyBindings,bindKey,keyPreset,keyAction};if(typeof module!=='undefined')module.exports=api;else root.Vocab=api;
 })(globalThis);
