@@ -151,9 +151,9 @@
  function parseExample(text,phrase){const raw=String(text),json=raw.slice(raw.indexOf('{'),raw.lastIndexOf('}')+1);let v;try{v=JSON.parse(json)}catch{throw Error('AI 返回的例句格式不对')}
   const en=String(v?.en||'').trim(),zh=String(v?.zh||'').trim(),n=(en.match(/[A-Za-z]+/g)||[]).length;if(!en||!zh||n<4||n>45)throw Error('AI 返回的例句不完整');if(!usesPhrase(en,phrase))throw Error('AI 写的例句没有用上这个搭配');return {en,zh}}
  // A saved collocation is its own card too: the Chinese and the word are the cue, the English collocation is the answer.
- function phraseItems(words,phrases){const byKey=new Map(words.map(w=>[key(w.word),w])),out=[];
+ function phraseItems(words,phrases,written={}){const byKey=new Map(words.map(w=>[key(w.word),w])),out=[];
   for(const [k,list] of Object.entries(phrases||{})){const w=byKey.get(k);if(!w||!Array.isArray(list))continue;
-   for(const raw of list){if(!(w.col||[]).includes(raw))continue;const [en,zh='']=raw.split('｜'),ex=[[w.example,w.translation],[w.example2,w.translation2]].find(([e])=>e&&usesPhrase(e,en))||['',''];out.push({word:w.word,uk:w.uk,us:w.us,cefr:w.cefr,meaning:w.meaning,example:ex[0],translation:ex[1],phrase:{en,zh,raw}})}}
+   for(const raw of list){if(!(w.col||[]).includes(raw))continue;const [en,zh='']=raw.split('｜'),ex=[[w.example,w.translation],[w.example2,w.translation2]].find(([e])=>e&&usesPhrase(e,en))||['',''];out.push({word:w.word,uk:w.uk,us:w.us,cefr:w.cefr,meaning:w.meaning,example:ex[0],translation:ex[1],phrase:{en,zh,raw},...(!ex[0]&&written[k]?.[raw]?{written:written[k][raw]}:{})})}}
   return out}
  function senseItems(words,rareSenses){const byKey=new Map(words.map(w=>[key(w.word),w])),fmt=p=>(p.pos?p.pos+' ':'')+p.text,out=[];
   for(const [k,texts] of Object.entries(rareSenses||{})){const w=byKey.get(k),parts=w?senses(w.meaning):[];if(parts.length<2||!Array.isArray(texts))continue;
