@@ -128,7 +128,8 @@
  const IRREGULAR=Object.fromEntries('is:be are:be am:be made:make paid:pay took:take taken:take gave:give given:give went:go gone:go came:come got:get gotten:get kept:keep held:hold brought:bring thought:think bought:buy caught:catch taught:teach left:leave felt:feel met:meet ran:run told:tell sold:sell said:say found:find stood:stand understood:understand sat:sit spent:spend built:build sent:send lost:lose won:win broke:break broken:break spoke:speak spoken:speak chose:choose chosen:choose wrote:write written:write drove:drive driven:drive rose:rise risen:rise fell:fall fallen:fall grew:grow grown:grow knew:know known:know threw:throw thrown:throw drew:draw drawn:draw saw:see seen:see did:do done:do was:be were:be been:be had:have led:lead bore:bear borne:bear struck:strike laid:lay dealt:deal meant:mean became:become began:begin begun:begin forgot:forget forgotten:forget hid:hide hidden:hide shook:shake shaken:shake woke:wake woken:wake wore:wear worn:wear ate:eat eaten:eat flew:fly flown:fly hung:hang fed:feed fought:fight sought:seek arose:arise arisen:arise withdrew:withdraw withdrawn:withdraw overcame:overcome undertook:undertake undertaken:undertake'.split(' ').map(x=>x.split(':')));
  const stem=t=>{for(const s of ['ies','es','ed','ing','s'])if(t.endsWith(s)&&t.length-s.length>=3)return t.slice(0,-s.length);return t};
  const tokens=(s,skip)=>(String(s).toLowerCase().replace(/['’]s\b/g,'').match(/[a-z]+/g)||[]).filter(t=>!skip||!PLACEHOLDERS.has(t)).map(t=>stem(IRREGULAR[t]||t));
- function usesPhrase(sentence,phrase){const want=tokens(phrase,true),got=tokens(sentence),same=(t,w)=>t===w||t.length>=3&&w.length>=3&&(t.startsWith(w)||w.startsWith(t));if(!want.length)return false;
+ const same=(t,w)=>t===w||t.length>=3&&w.length>=3&&(t.startsWith(w)||w.startsWith(t));
+ function usesPhrase(sentence,phrase){const want=tokens(phrase,true),got=tokens(sentence);if(!want.length)return false;
   for(let s=0;s<got.length;s++){if(!same(got[s],want[0]))continue;let i=1,last=s;for(let j=s+1;j<got.length&&i<want.length&&j-last<=4;j++)if(same(got[j],want[i])){i++;last=j}if(i===want.length)return true}return false}
  // The list entry for a word as it appears in text: "suspended" → suspend, "paid" → pay, "studies" → study, "stopped" → stop.
  function lookupWord(token,has){const t=String(token).toLowerCase().replace(/[’']s$/,'').replace(/’/g,"'"),c=[t,IRREGULAR[t]];if(t.endsWith('ies'))c.push(t.slice(0,-3)+'y');if(t.endsWith('es'))c.push(t.slice(0,-2));if(t.endsWith('s'))c.push(t.slice(0,-1));
@@ -147,6 +148,17 @@
  function originalsFor(index,phrase,limit=2){const want=tokens(phrase,true);if(!index||!want.length)return [];const first=want[0],ids=new Set();
   for(const [t,list] of index.postings)if(t===first||t.length>=3&&first.length>=3&&(t.startsWith(first)||first.startsWith(t)))for(const id of list)ids.add(id);
   return [...ids].map(id=>index.sentences[id]).filter(s=>usesPhrase(s.text,phrase)).sort((a,b)=>a.text.length-b.text.length).slice(0,limit)}
+ // Where a sentence uses a word or collocation, as character ranges for highlighting; the same matching as usesPhrase.
+ // Words joined only by spaces or hyphens become one range ("in suspension"); separated words get their own ("put … in place").
+ function matchSpans(sentence,phrase){const text=String(sentence),want=tokens(phrase,true),got=[];if(!want.length)return [];
+  for(const m of text.matchAll(/[A-Za-z]+/g)){const t=m[0].toLowerCase();if(t==='s'&&/['’]$/.test(text.slice(0,m.index)))continue;got.push({t:stem(IRREGULAR[t]||t),from:m.index,to:m.index+m[0].length})}
+  for(let s=0;s<got.length;s++){if(!same(got[s].t,want[0]))continue;const hit=[got[s]];let i=1,last=s;for(let j=s+1;j<got.length&&i<want.length&&j-last<=4;j++)if(same(got[j].t,want[i])){hit.push(got[j]);i++;last=j}
+   if(i===want.length){const out=[];for(const h of hit){const prev=out.at(-1);if(prev&&/^[\s-]*$/.test(text.slice(prev[1],h.from)))prev[1]=h.to;else out.push([h.from,h.to])}return out}}
+  return []}
+ // Where a translation renders a Chinese gloss: the longest stretch of two or more characters it shares with any item of the gloss.
+ function glossSpans(text,gloss){const t=String(text),items=String(gloss).split(/[；;，,、…（）()\s]+/).filter(x=>x.length>=2);let best='';
+  for(const item of items)for(let n=item.length;n>=2&&n>best.length;n--)for(let i=0;i+n<=item.length;i++){const part=item.slice(i,i+n);if(t.includes(part)){best=part;break}}
+  const out=[];if(best)for(let at=t.indexOf(best);at>=0;at=t.indexOf(best,at+best.length))out.push([at,at+best.length]);return out}
  // An AI-written example is kept only if it parses, is a sentence of sensible length and really uses the collocation.
  function parseExample(text,phrase){const raw=String(text),json=raw.slice(raw.indexOf('{'),raw.lastIndexOf('}')+1);let v;try{v=JSON.parse(json)}catch{throw Error('AI 返回的例句格式不对')}
   const en=String(v?.en||'').trim(),zh=String(v?.zh||'').trim(),n=(en.match(/[A-Za-z]+/g)||[]).length;if(!en||!zh||n<4||n>45)throw Error('AI 返回的例句不完整');if(!usesPhrase(en,phrase))throw Error('AI 写的例句没有用上这个搭配');return {en,zh}}
@@ -165,5 +177,5 @@
  function newFrom(words,progress,level){const from=CEFR.indexOf(level);return from<=0?words:words.filter(w=>progress[key(w.word)]||!CEFR.includes(w.cefr)||CEFR.indexOf(w.cefr)>=from)}
  // A card forgotten or first met moments ago can't be mastered yet: while it is in its short relearning step, 精通 counts as 简单.
  const effectiveRating=(prior,rating)=>rating==='mastered'&&prior&&prior.interval<1?'easy':rating;
- const api={key,day,parse,knownGoal,variantOf,senses,collocationSenses,itemKey,senseItems,phraseItems,usesPhrase,parseExample,lookupWord,sentenceIndex,originalsFor,effectiveRating,CEFR,newFrom,queue,grade,today,overall,tomorrow,level,levelTable,legacyPeak,MASTERED_DAYS,ALGORITHMS,KEY_ACTIONS,KEY_PRESETS,DEFAULT_PRESET,normalizeCode,bindable,keyLabel,keyBindings,bindKey,keyPreset,keyAction};if(typeof module!=='undefined')module.exports=api;else root.Vocab=api;
+ const api={key,day,parse,knownGoal,variantOf,senses,collocationSenses,itemKey,senseItems,phraseItems,usesPhrase,matchSpans,glossSpans,parseExample,lookupWord,sentenceIndex,originalsFor,effectiveRating,CEFR,newFrom,queue,grade,today,overall,tomorrow,level,levelTable,legacyPeak,MASTERED_DAYS,ALGORITHMS,KEY_ACTIONS,KEY_PRESETS,DEFAULT_PRESET,normalizeCode,bindable,keyLabel,keyBindings,bindKey,keyPreset,keyAction};if(typeof module!=='undefined')module.exports=api;else root.Vocab=api;
 })(globalThis);
