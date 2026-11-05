@@ -155,9 +155,9 @@
   for(const [k,list] of Object.entries(phrases||{})){const w=byKey.get(k);if(!w||!Array.isArray(list))continue;
    for(const raw of list){if(!(w.col||[]).includes(raw))continue;const [en,zh='']=raw.split('｜'),ex=[[w.example,w.translation],[w.example2,w.translation2]].find(([e])=>e&&usesPhrase(e,en))||['',''];out.push({word:w.word,uk:w.uk,us:w.us,cefr:w.cefr,meaning:w.meaning,example:ex[0],translation:ex[1],phrase:{en,zh,raw},...(!ex[0]&&written[k]?.[raw]?{written:written[k][raw]}:{})})}}
   return out}
- function senseItems(words,rareSenses){const byKey=new Map(words.map(w=>[key(w.word),w])),fmt=p=>(p.pos?p.pos+' ':'')+p.text,out=[];
+ function senseItems(words,rareSenses,written={}){const byKey=new Map(words.map(w=>[key(w.word),w])),fmt=p=>(p.pos?p.pos+' ':'')+p.text,out=[];
   for(const [k,texts] of Object.entries(rareSenses||{})){const w=byKey.get(k),parts=w?senses(w.meaning):[];if(parts.length<2||!Array.isArray(texts))continue;
-   const owner=collocationSenses(w.col,parts);for(const text of texts){const j=parts.findIndex(p=>p.text===text),s=parts[j];if(s)out.push({word:w.word,uk:w.uk,us:w.us,cefr:w.cefr,meaning:fmt(s),def:w.en?.[j]||'',col:(w.col||[]).filter((c,i)=>owner[i]===j),sense:{text:s.text,pos:s.pos,others:parts.filter(p=>p!==s).map(fmt),known:parts.filter(p=>!texts.includes(p.text)).map(p=>p.text)}})}}
+   const owner=collocationSenses(w.col,parts);for(const text of texts){const j=parts.findIndex(p=>p.text===text),s=parts[j];if(s)out.push({word:w.word,uk:w.uk,us:w.us,cefr:w.cefr,meaning:fmt(s),def:w.en?.[j]||'',col:(w.col||[]).filter((c,i)=>owner[i]===j),...(written[k]?.[s.text]?{written:written[k][s.text]}:{}),sense:{text:s.text,pos:s.pos,others:parts.filter(p=>p!==s).map(fmt),known:parts.filter(p=>!texts.includes(p.text)).map(p=>p.text)}})}}
   return out}
  // The built-in list runs from A1 to C2 (CEFR). Starting new words at a higher level skips the easier ones; words already
  // studied keep their reviews, and imported words without a level are always included.
