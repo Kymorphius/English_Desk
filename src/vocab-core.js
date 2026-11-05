@@ -28,12 +28,15 @@
  const ALGORITHMS=['classic','fsrs','sm2'];
  function nextMonth(now){const due=new Date(now),date=due.getDate();due.setDate(1);due.setMonth(due.getMonth()+1);const last=new Date(due.getFullYear(),due.getMonth()+1,0).getDate();due.setDate(Math.min(date,last));return due.getTime()}
  // Fixed multipliers: the original and default schedule.
- function classic(previous,rating){const old=previous?.interval||0;return {interval:rating==='again'?1/1440:rating==='hard'?Math.max(1,old*1.2):rating==='good'?Math.max(1,old*2.5):Math.max(4,old*3.5)}}
+ // After seeing the answer: the author's fixed schedule brings the word back after a minute; FSRS and SM-2 wait ten, since a minute later
+ // the answer is still in short-term memory and the re-test proves little.
+ const AGAIN_STEP=1/1440,RELEARN=10/1440;
+ function classic(previous,rating){const old=previous?.interval||0;return {interval:rating==='again'?AGAIN_STEP:rating==='hard'?Math.max(1,old*1.2):rating==='good'?Math.max(1,old*2.5):Math.max(4,old*3.5)}}
  // SuperMemo SM-2 (Wozniak, 1987): per-word easiness factor; a failed recall restarts the repetition count without touching EF.
  function sm2(previous,rating){
   const q={again:1,hard:3,good:4,easy:5,mastered:5}[rating];let ef=previous?.ef,reps=previous?.reps;const old=previous?.interval||0;
   if(ef===undefined){ef=2.5;reps=old>=6?2:old>=1?1:0}
-  if(q<3)return {interval:1/1440,ef,reps:0};
+  if(q<3)return {interval:RELEARN,ef,reps:0};
   const interval=reps===0?1:reps===1?6:Math.round(Math.max(old,1)*ef);
   return {interval,reps:reps+1,ef:Math.max(1.3,ef+0.1-(5-q)*(0.08+(5-q)*0.02))};
  }
@@ -54,7 +57,7 @@
      :s*(1+Math.exp(W[8])*(11-d)*Math.pow(s,-W[9])*(Math.exp(W[10]*(1-r))-1)*(g===2?W[15]:1)*(g===4?W[16]:1));}
    d=clampD(W[7]*initD(4)+(1-W[7])*(d+(-W[6]*(g-3))*(10-d)/9));
   }
-  s=Math.max(0.01,s);return {interval:g===1?1/1440:fsrsInterval(s,retention),s,d};
+  s=Math.max(0.01,s);return {interval:g===1?RELEARN:fsrsInterval(s,retention),s,d};
  }
  function grade(previous,rating,now=Date.now(),options={}){
   if(!RATINGS.includes(rating))throw Error('未知评分');
